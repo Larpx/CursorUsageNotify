@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CursorUsageNotify.Core/CursorUsageNotify.Core.csproj" />
+    <Project Path="src/CursorUsageNotify.GUI/CursorUsageNotify.GUI.csproj" />
+    <Project Path="src/CursorUsageNotify.Models/CursorUsageNotify.Models.csproj" />
+    <Project Path="src/CursorUsageNotify.Services/CursorUsageNotify.Services.csproj" />
+    <Project Path="src/CursorUsageNotify.Tests/CursorUsageNotify.Tests.csproj" />
+  </Folder>
+</Solution>

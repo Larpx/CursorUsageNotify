@@ -1,0 +1,81 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:CursorUsageNotify.GUI.ViewModels"
+             xmlns:conv="using:CursorUsageNotify.GUI.Converters"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
+             x:Class="CursorUsageNotify.GUI.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <UserControl.Resources>
+        <conv:SuccessToColorConverter x:Key="SuccessToColor"/>
+    </UserControl.Resources>
+
+    <ScrollViewer Padding="24" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Orientation="Vertical" Spacing="16" MaxWidth="640">
+
+            <!-- API 密钥区 -->
+            <Border BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="8" Padding="16">
+                <StackPanel Orientation="Vertical" Spacing="12">
+                    <TextBlock Text="API 密钥" FontSize="16" FontWeight="SemiBold"/>
+
+                    <StackPanel Orientation="Vertical" Spacing="4">
+                        <TextBlock Text="Session Token（从浏览器 F12 复制 WorkosCursorSessionToken）" FontSize="12" Foreground="#FF6B7280"/>
+                        <TextBox Text="{Binding SessionToken}"
+                                 PasswordChar="●"
+                                 PlaceholderText="粘贴 WorkosCursorSessionToken"
+                                 AcceptsReturn="False"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="测试连接"
+                                Command="{Binding TestConnectionCommand}"
+                                IsEnabled="{Binding !IsTesting}"/>
+                        <Button Content="立即拉取一次"
+                                Command="{Binding SyncNowCommand}"/>
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding TestResult}"
+                               FontSize="13"
+                               Foreground="{Binding TestSuccess, Converter={StaticResource SuccessToColor}}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 间隔设置区 -->
+            <Border BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="8" Padding="16">
+                <StackPanel Orientation="Vertical" Spacing="12">
+                    <TextBlock Text="定时设置" FontSize="16" FontWeight="SemiBold"/>
+
+                    <StackPanel Orientation="Vertical" Spacing="4">
+                        <TextBlock Text="数据拉取间隔" FontSize="12" Foreground="#FF6B7280"/>
+                        <ComboBox ItemsSource="{Binding IntervalOptions}"
+                                  SelectedItem="{Binding SyncIntervalMinutes}"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Vertical" Spacing="4">
+                        <TextBlock Text="通知间隔（分钟）" FontSize="12" Foreground="#FF6B7280"/>
+                        <ComboBox ItemsSource="{Binding IntervalOptions}"
+                                  SelectedItem="{Binding NotificationIntervalMinutes}"/>
+                    </StackPanel>
+
+                    <Button Content="保存设置" Command="{Binding SaveSettingsCommand}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 危险操作区 -->
+            <Border BorderBrush="#FFFECACA" BorderThickness="1" CornerRadius="8" Padding="16" Background="#FFFEF2F2">
+                <StackPanel Orientation="Vertical" Spacing="12">
+                    <TextBlock Text="数据管理" FontSize="16" FontWeight="SemiBold" Foreground="#FFB91C1C"/>
+                    <TextBlock Text="清空所有历史用量数据，此操作不可撤销。" FontSize="12" Foreground="#FF7F1D1D"/>
+                    <Button Content="清空历史数据"
+                            Command="{Binding ClearDataCommand}"
+                            Background="#FFEF4444"
+                            Foreground="White"/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+
+</UserControl>

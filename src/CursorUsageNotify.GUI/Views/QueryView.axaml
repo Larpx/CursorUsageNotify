@@ -1,0 +1,69 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:CursorUsageNotify.GUI.ViewModels"
+             xmlns:conv="using:CursorUsageNotify.GUI.Converters"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
+             x:Class="CursorUsageNotify.GUI.Views.QueryView"
+             x:DataType="vm:QueryViewModel">
+
+    <UserControl.Resources>
+        <conv:CentsToCurrencyConverter x:Key="CentsToCurrency"/>
+        <conv:EpochToDateTimeConverter x:Key="EpochToDate"/>
+    </UserControl.Resources>
+
+    <DockPanel LastChildFill="True">
+
+        <!-- 顶部筛选区 -->
+        <Border DockPanel.Dock="Top" Padding="16,12" Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="起始：" VerticalAlignment="Center"/>
+                <DatePicker SelectedDate="{Binding StartTime}"/>
+
+                <TextBlock Text="结束：" VerticalAlignment="Center"/>
+                <DatePicker SelectedDate="{Binding EndTime}"/>
+
+                <TextBlock Text="模型：" VerticalAlignment="Center"/>
+                <ComboBox ItemsSource="{Binding Models}"
+                          SelectedItem="{Binding SelectedModel}"
+                          PlaceholderText="全部"
+                          MinWidth="160"/>
+
+                <Button Content="查询" Command="{Binding LoadCommand}"/>
+                <Button Content="导出 CSV" Command="{Binding ExportCsvCommand}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- 状态栏 -->
+        <Border DockPanel.Dock="Bottom" Padding="16,8" Background="#FFF3F4F6" BorderBrush="#FFE5E7EB" BorderThickness="0,1,0,0">
+            <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#FF4B5563"/>
+        </Border>
+
+        <!-- DataGrid -->
+        <DataGrid ItemsSource="{Binding Events}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  GridLinesVisibility="Horizontal"
+                  BorderThickness="1"
+                  BorderBrush="#FFE5E7EB"
+                  HeadersVisibility="Column">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="时间"
+                                    Binding="{Binding Timestamp, Converter={StaticResource EpochToDate}}"
+                                    MinWidth="160"/>
+                <DataGridTextColumn Header="模型" Binding="{Binding Model}" MinWidth="160"/>
+                <DataGridTextColumn Header="输入 Token" Binding="{Binding InputTokens, StringFormat=\{0:N0\}}"/>
+                <DataGridTextColumn Header="输出 Token" Binding="{Binding OutputTokens, StringFormat=\{0:N0\}}"/>
+                <DataGridTextColumn Header="缓存读" Binding="{Binding CacheReadTokens, StringFormat=\{0:N0\}}"/>
+                <DataGridTextColumn Header="缓存写" Binding="{Binding CacheWriteTokens, StringFormat=\{0:N0\}}"/>
+                <DataGridTextColumn Header="费用"
+                                    Binding="{Binding TotalCents, Converter={StaticResource CentsToCurrency}}"/>
+                <DataGridCheckBoxColumn Header="Max" Binding="{Binding MaxMode}"/>
+                <DataGridCheckBoxColumn Header="Headless" Binding="{Binding IsHeadless}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+    </DockPanel>
+
+</UserControl>
