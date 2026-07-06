@@ -124,6 +124,9 @@ internal sealed class Program
         builder.Services.AddSingleton<SettingsViewModel>();
         builder.Services.AddSingleton<QueryViewModel>();
 
+        // CSV 导出实现
+        builder.Services.AddSingleton<CursorUsageNotify.Services.Export.ICsvExporter, CursorUsageNotify.Services.Export.CsvExporter>();
+
         // MainWindow
         builder.Services.AddSingleton<MainWindow>();
 
@@ -134,6 +137,7 @@ internal sealed class Program
             sp.GetRequiredService<MainWindow>,
             QuitApplication,
             sp.GetRequiredService<ILogger<TrayIconHost>>()));
+
 
         return builder.Build();
     }
