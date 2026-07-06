@@ -15,17 +15,19 @@
     <ScrollViewer Padding="24" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Orientation="Vertical" Spacing="16" MaxWidth="640">
 
-            <!-- API 密钥区 -->
+            <!-- Cookie 认证区 -->
             <Border BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="8" Padding="16">
                 <StackPanel Orientation="Vertical" Spacing="12">
-                    <TextBlock Text="API 密钥" FontSize="16" FontWeight="SemiBold"/>
+                    <TextBlock Text="Cookie 认证" FontSize="16" FontWeight="SemiBold"/>
 
                     <StackPanel Orientation="Vertical" Spacing="4">
-                        <TextBlock Text="Session Token（从浏览器 F12 复制 WorkosCursorSessionToken）" FontSize="12" Foreground="#FF6B7280"/>
+                        <TextBlock Text="Cookie（从浏览器 F12 → 应用 → Cookie 中复制完整 Cookie 字符串）" FontSize="12" Foreground="#FF6B7280"/>
                         <TextBox Text="{Binding SessionToken}"
                                  PasswordChar="●"
-                                 PlaceholderText="粘贴 WorkosCursorSessionToken"
+                                 PlaceholderText="粘贴 WorkosCursorSessionToken=xxx 或完整 Cookie"
                                  AcceptsReturn="False"/>
+                        <TextBlock Text="支持直接粘贴完整 Cookie 字符串，自动解析 WorkosCursorSessionToken"
+                                   FontSize="11" Foreground="#FF9CA3AF"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Spacing="12">

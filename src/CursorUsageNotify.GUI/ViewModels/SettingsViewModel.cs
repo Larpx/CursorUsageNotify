@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -12,7 +13,7 @@ using CursorUsageNotify.Services.Storage;
 namespace CursorUsageNotify.GUI.ViewModels;
 
 /// <summary>
-/// 设置 Tab：API 密钥 + 测试、拉取间隔、通知间隔、立即拉取、清空数据。
+/// 设置 Tab：Cookie 认证 + 测试、拉取间隔、通知间隔、立即拉取、清空数据。
 /// </summary>
 public sealed partial class SettingsViewModel : ViewModelBase
 {
@@ -21,6 +22,11 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private readonly UsageSyncOptions _options;
     private readonly TokenProtector _protector;
     private readonly IUsageRepository _repository;
+
+    // 匹配 "WorkosCursorSessionToken=<value>"，value 为分号或结尾前的非空内容
+    private static readonly Regex TokenRegex = new(
+        @"WorkosCursorSessionToken\s*=\s*(?<token>[^;]+)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public SettingsViewModel(
         ICursorApiClient apiClient,
@@ -48,6 +54,38 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _sessionToken = string.Empty;
+
+    /// <summary>
+    /// 从用户输入的原始字符串中提取 WorkosCursorSessionToken 值。
+    /// 支持直接粘贴完整 Cookie 字符串，也兼容直接粘贴 Token 值。
+    /// </summary>
+    private static string ExtractToken(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return string.Empty;
+
+        // 如果包含 "="，认为是 Cookie 格式，尝试解析
+        if (raw.Contains('='))
+        {
+            var match = TokenRegex.Match(raw);
+            if (match.Success)
+                return match.Groups["token"].Value.Trim();
+        }
+
+        // 不包含 "=" 或解析失败，直接当作 token 值
+        return raw.Trim();
+    }
+
+    partial void OnSessionTokenChanged(string value)
+    {
+        var extracted = ExtractToken(value);
+        if (extracted != value)
+        {
+            // 重新赋值触发属性变更，但需避免无限递归
+            _sessionToken = extracted;
+            OnPropertyChanged(nameof(SessionToken));
+        }
+    }
 
     [ObservableProperty]
     private int _syncIntervalMinutes = 60;
