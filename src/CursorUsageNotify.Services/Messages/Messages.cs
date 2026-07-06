@@ -31,11 +31,28 @@ public sealed record ToggleSyncMessage(bool IsRunning);
 public sealed record TriggerSyncNowMessage();
 
 /// <summary>
+/// 同步开始通知（用于 UI 显示进度条，表示程序运行中而非卡顿）。
+/// </summary>
+public sealed record SyncStartedMessage();
+
+/// <summary>
 /// 拉取失败通知（用于 UI 状态灯变红）。
 /// </summary>
 public sealed record SyncFailedMessage(string Error);
 
 /// <summary>
+/// Cookie/Session 临近过期或已失效通知，提醒用户更新 cookie。
+/// </summary>
+/// <param name="ExpiryUtc">会话过期时间（UTC）。</param>
+/// <param name="IsExpired">是否已过期（true=已失效需立即更新，false=即将过期预警）。</param>
+public sealed record CookieExpiringSoonMessage(DateTime ExpiryUtc, bool IsExpired);
+
+/// <summary>
 /// 通知已显示，UI 更新"最近一次通知时间"。
 /// </summary>
 public sealed record NotificationShownMessage(long TimestampMs);
+
+/// <summary>
+/// 请求切换到设置 Tab（用于 Cookie 预警条"立即更新"按钮跳转）。
+/// </summary>
+public sealed record SwitchToSettingsTabMessage();

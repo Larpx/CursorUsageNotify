@@ -30,12 +30,12 @@ public sealed class UserInfoEntity
     public string? Role { get; set; }
 
     /// <summary>月度支出限额（美元）。</summary>
-    [SugarColumn(ColumnName = "monthly_limit_dollars")]
+    [SugarColumn(ColumnName = "monthly_limit_dollars", IsNullable = true)]
     public decimal? MonthlyLimitDollars { get; set; }
 
     /// <summary>硬性限额覆盖（美元，0 表示无覆盖）。</summary>
     [SugarColumn(ColumnName = "hard_limit_override_dollars")]
-    public decimal HardLimitOverrideDollars { get; set; }
+    public decimal? HardLimitOverrideDollars { get; set; }
 
     /// <summary>快照时间（epoch 毫秒）。</summary>
     [SugarColumn(ColumnName = "snapshot_time")]

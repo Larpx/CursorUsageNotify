@@ -1,5 +1,7 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using CursorUsageNotify.Models.Dtos;
 using CursorUsageNotify.Models.Entities;
@@ -22,11 +24,17 @@ public sealed partial class MainViewModel : ViewModelBase
         _repository = repository;
         Messenger.Register<UsageDataFetchedMessage>(this, OnDataFetched);
         Messenger.Register<SyncFailedMessage>(this, OnSyncFailed);
+        Messenger.Register<SyncStartedMessage>(this, OnSyncStarted);
+        Messenger.Register<CookieExpiringSoonMessage>(this, OnCookieExpiring);
         _ = LoadAsync();
     }
 
     [ObservableProperty]
     private string _userEmail = "未获取";
+
+    /// <summary>用户显示名（优先 Name，其次 Email）。</summary>
+    [ObservableProperty]
+    private string _userDisplayName = "未获取";
 
     [ObservableProperty]
     private string _planName = "未获取";
@@ -55,10 +63,34 @@ public sealed partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private string _statusText = "等待中";
 
+    /// <summary>是否正在同步（控制顶部进度条显示，避免误以为卡顿）。</summary>
+    [ObservableProperty]
+    private bool _isSyncing;
+
+    /// <summary>Cookie 有效性状态文本（空表示正常，非空显示预警）。</summary>
+    [ObservableProperty]
+    private string _cookieStatusText = string.Empty;
+
+    /// <summary>Cookie 预警颜色（红=已失效，黄=即将过期）。</summary>
+    [ObservableProperty]
+    private string _cookieStatusColor = string.Empty;
+
+    /// <summary>是否有 Cookie 预警（控制预警条可见性）。</summary>
+    public bool HasCookieWarning => !string.IsNullOrEmpty(CookieStatusText);
+
+    partial void OnCookieStatusTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasCookieWarning));
+    }
+
     // 订阅信息
 
     [ObservableProperty]
     private string _subStartDate = "-";
+
+    /// <summary>当前订阅周期结束日期（或下次续费/取消日期）。</summary>
+    [ObservableProperty]
+    private string _subEndDate = "-";
 
     [ObservableProperty]
     private string _subStatus = "-";
@@ -68,13 +100,43 @@ public sealed partial class MainViewModel : ViewModelBase
 
     private void OnDataFetched(object recipient, UsageDataFetchedMessage msg)
     {
+        IsSyncing = false;
         _ = LoadAsync(msg);
     }
 
     private void OnSyncFailed(object recipient, SyncFailedMessage msg)
     {
+        IsSyncing = false;
         StatusColor = "#dc3545"; // 红
         StatusText = $"失败：{msg.Error}";
+        // 认证类失败（401/403）视为 cookie 失效
+        if (msg.Error.Contains("401") || msg.Error.Contains("403") || msg.Error.Contains("认证"))
+        {
+            CookieStatusText = "Cookie 已失效，请在设置中更新";
+            CookieStatusColor = "#dc3545";
+        }
+    }
+
+    private void OnSyncStarted(object recipient, SyncStartedMessage msg)
+    {
+        IsSyncing = true;
+        StatusColor = "#f59e0b"; // 黄=同步中
+        StatusText = "同步中...";
+    }
+
+    private void OnCookieExpiring(object recipient, CookieExpiringSoonMessage msg)
+    {
+        if (msg.IsExpired)
+        {
+            CookieStatusText = "Cookie 已失效，请在设置中更新";
+            CookieStatusColor = "#dc3545";
+        }
+        else
+        {
+            var days = Math.Max(0, (int)(msg.ExpiryUtc - DateTime.UtcNow).TotalDays);
+            CookieStatusText = $"Cookie 将在 {days} 天后过期（{msg.ExpiryUtc:yyyy-MM-dd}）";
+            CookieStatusColor = "#f59e0b";
+        }
     }
 
     /// <summary>
@@ -88,27 +150,36 @@ public sealed partial class MainViewModel : ViewModelBase
         var agg = msg?.AggregateStats;
 
         // 如果消息中没有聚合数据，尝试按当前周期自行查询
-        if (agg is null && sub is not null && sub.CurrentPeriodStart > 0 && sub.CurrentPeriodEnd > 0)
+        // 优先 subscription 周期，其次 period 周期（sub 可能为空，period 仍可用）
+        if (agg is null)
         {
-            agg = await _repository.AggregateStatsAsync(sub.CurrentPeriodStart, sub.CurrentPeriodEnd);
+            var aggStart = sub?.CurrentPeriodStart ?? period?.PeriodStart ?? 0;
+            var aggEnd = sub?.CurrentPeriodEnd ?? period?.PeriodEnd ?? 0;
+            if (aggStart > 0 && aggEnd > 0)
+            {
+                agg = await _repository.AggregateStatsAsync(aggStart, aggEnd);
+            }
         }
 
         // 用户信息：优先 user_info 表，其次事件表聚合，再其次 subscription
+        string? resolvedEmail = null;
+        string? resolvedName = null;
+        string? resolvedPlan = null;
         if (user is not null)
         {
-            UserEmail = string.IsNullOrEmpty(user.Email) ? "未知" : user.Email;
-            PlanName = user.PlanName ?? "未知";
+            resolvedEmail = string.IsNullOrEmpty(user.Email) ? null : user.Email;
+            resolvedName = user.Name;
+            resolvedPlan = user.PlanName;
         }
-        else if (agg?.UserEmail is not null)
-        {
-            UserEmail = agg.UserEmail;
-            PlanName = sub?.Plan ?? period?.PlanName ?? "未知";
-        }
-        else
-        {
-            UserEmail = sub?.Email ?? "未知";
-            PlanName = sub?.Plan ?? "未知";
-        }
+
+        resolvedEmail ??= agg?.UserEmail ?? sub?.Email;
+        resolvedPlan ??= sub?.Plan ?? period?.PlanName;
+
+        UserEmail = string.IsNullOrEmpty(resolvedEmail) ? "未知" : resolvedEmail;
+        UserDisplayName = !string.IsNullOrEmpty(resolvedName) ? resolvedName
+                          : !string.IsNullOrEmpty(resolvedEmail) ? resolvedEmail
+                          : "未知";
+        PlanName = resolvedPlan ?? "未知";
 
         // 订阅周期：优先 subscription 实体，其次 period entity
         var periodStart = sub?.CurrentPeriodStart ?? period?.PeriodStart ?? 0;
@@ -146,6 +217,13 @@ public sealed partial class MainViewModel : ViewModelBase
                 var subStart = DateTimeOffset.FromUnixTimeMilliseconds(sub.SubscriptionStart).LocalDateTime;
                 SubStartDate = $"{subStart:yyyy-MM-dd}";
             }
+            if (sub.CurrentPeriodEnd > 0)
+            {
+                var subEnd = DateTimeOffset.FromUnixTimeMilliseconds(sub.CurrentPeriodEnd).LocalDateTime;
+                SubEndDate = sub.CancelAtPeriodEnd
+                    ? $"{subEnd:yyyy-MM-dd}（到期取消）"
+                    : $"{subEnd:yyyy-MM-dd}（自动续费）";
+            }
             SubStatus = sub.Status switch
             {
                 "active" => "活跃",
@@ -164,6 +242,37 @@ public sealed partial class MainViewModel : ViewModelBase
                 .LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss");
             StatusColor = "#28a745"; // 绿
             StatusText = "已同步";
+        }
+    }
+
+    /// <summary>
+    /// 跳转到设置 Tab 更新 cookie（用于 Cookie 预警条"立即更新"按钮）。
+    /// </summary>
+    [RelayCommand]
+    private void OpenSettings()
+    {
+        Messenger.Send(new SwitchToSettingsTabMessage());
+    }
+
+    /// <summary>
+    /// 用系统默认浏览器打开 Cursor 登录页，方便用户重新登录获取新 cookie。
+    /// UseShellExecute=true 让系统按 URL 协议选择默认浏览器。
+    /// </summary>
+    [RelayCommand]
+    private void OpenBrowser()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "https://cursor.com/dashboard/billing",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"打开浏览器失败：{ex.Message}";
+            StatusColor = "#dc3545";
         }
     }
 }

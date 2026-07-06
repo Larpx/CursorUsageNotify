@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -164,6 +165,30 @@ public sealed partial class SettingsViewModel : ViewModelBase
         _options.SessionToken = SessionToken;
         Messenger.Send(new TriggerSyncNowMessage());
         TestResult = "已触发立即拉取";
+    }
+
+    /// <summary>
+    /// 用系统默认浏览器打开 Cursor 登录页，方便用户重新登录后复制新 cookie。
+    /// UseShellExecute=true 让系统按 URL 协议选择默认浏览器。
+    /// </summary>
+    [RelayCommand]
+    private void OpenBrowser()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "https://cursor.com/dashboard/billing",
+                UseShellExecute = true
+            });
+            TestSuccess = true;
+            TestResult = "已打开浏览器，登录后请复制新 Cookie 粘贴到上方文本框";
+        }
+        catch (Exception ex)
+        {
+            TestSuccess = false;
+            TestResult = $"打开浏览器失败：{ex.Message}";
+        }
     }
 
     /// <summary>清空所有历史用量数据（用户手动触发，不可撤销）。</summary>

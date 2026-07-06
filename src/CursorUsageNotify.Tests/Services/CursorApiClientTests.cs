@@ -29,14 +29,22 @@ public class CursorApiClientTests
 
     private const string SamplePeriodResponse = """
         {
-            "periodStart": 1704067200000,
-            "periodEnd": 1706745599000,
-            "planName": "Pro",
-            "includedRequests": 500,
-            "usedRequests": 100,
-            "usedTokens": 50000,
-            "totalSpendCents": 200,
-            "remainingRequests": 400
+            "billingCycleStart": "1704067200000",
+            "billingCycleEnd": "1706745599000",
+            "planUsage": {
+                "totalSpend": 200,
+                "includedSpend": 100,
+                "remaining": 300,
+                "limit": 500,
+                "autoPercentUsed": 40,
+                "apiPercentUsed": 0,
+                "totalPercentUsed": 40
+            },
+            "spendLimitUsage": {
+                "individualLimit": 500,
+                "individualRemaining": 300,
+                "limitType": "default"
+            }
         }
         """;
 
@@ -84,9 +92,10 @@ public class CursorApiClientTests
 
         var dto = await client.GetCurrentPeriodUsageAsync("token");
 
-        Assert.Equal("Pro", dto.PlanName);
-        Assert.Equal(500, dto.IncludedRequests);
+        Assert.Equal(1704067200000L, dto.PeriodStartMs);
+        Assert.Equal(1706745599000L, dto.PeriodEndMs);
         Assert.Equal(200, dto.TotalSpendCents);
+        Assert.Equal(300, dto.RemainingCents);
     }
 
     private static CursorApiClient CreateClient(HttpMessageHandler handler)

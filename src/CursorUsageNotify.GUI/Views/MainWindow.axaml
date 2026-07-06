@@ -20,6 +20,38 @@
 
     <DockPanel LastChildFill="True">
 
+        <!-- 同步进度条：IsSyncing 为 true 时显示滚动动画，避免误以为卡顿 -->
+        <ProgressBar DockPanel.Dock="Top"
+                     IsIndeterminate="True"
+                     IsVisible="{Binding IsSyncing}"
+                     Height="3"
+                     Minimum="0" Maximum="100"
+                     Foreground="#FF60A5FA"
+                     Background="Transparent"/>
+
+        <!-- Cookie 有效性预警条：临近过期或已失效时显示，提醒用户更新 cookie -->
+        <Border DockPanel.Dock="Top"
+                IsVisible="{Binding HasCookieWarning}"
+                Background="#3f1d1d"
+                Padding="24,6">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Ellipse Width="8" Height="8" Fill="{Binding CookieStatusColor}"/>
+                    <TextBlock Text="{Binding CookieStatusText}" FontSize="12" Foreground="#FFFCA5A5"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Content="打开浏览器"
+                            Command="{Binding OpenBrowserCommand}"
+                            Padding="8,2" FontSize="11"
+                            Background="#FFB91C1C" Foreground="White"/>
+                    <Button Content="立即更新"
+                            Command="{Binding OpenSettingsCommand}"
+                            Padding="8,2" FontSize="11"
+                            Background="#FFB91C1C" Foreground="White"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- 顶部数据大屏 -->
         <Border DockPanel.Dock="Top" Background="#FF1F2937" Padding="24,16">
             <StackPanel Orientation="Vertical" Spacing="12">
@@ -28,13 +60,14 @@
                 <StackPanel Orientation="Horizontal" Spacing="24">
                     <StackPanel Orientation="Vertical" Spacing="4" MinWidth="180">
                         <TextBlock Text="用户" FontSize="12" Foreground="#FF9CA3AF"/>
-                        <TextBlock Text="{Binding UserEmail}" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
-                        <TextBlock Text="{Binding PlanName}" FontSize="13" Foreground="#FFD1D5DB"/>
+                        <TextBlock Text="{Binding UserDisplayName}" FontSize="16" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="{Binding UserEmail}" FontSize="11" Foreground="#FF9CA3AF"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Vertical" Spacing="4" MinWidth="180">
                         <TextBlock Text="订阅周期" FontSize="12" Foreground="#FF9CA3AF"/>
                         <TextBlock Text="{Binding PeriodRange}" FontSize="14" Foreground="White"/>
+                        <TextBlock Text="{Binding PlanName}" FontSize="13" Foreground="#FFD1D5DB"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Vertical" Spacing="4" MinWidth="180">
@@ -79,6 +112,11 @@
                     <StackPanel Orientation="Vertical" Spacing="4" MinWidth="180">
                         <TextBlock Text="订阅起始" FontSize="12" Foreground="#FF9CA3AF"/>
                         <TextBlock Text="{Binding SubStartDate}" FontSize="14" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Vertical" Spacing="4" MinWidth="200">
+                        <TextBlock Text="订阅结束" FontSize="12" Foreground="#FF9CA3AF"/>
+                        <TextBlock Text="{Binding SubEndDate}" FontSize="14" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Vertical" Spacing="4" MinWidth="140">

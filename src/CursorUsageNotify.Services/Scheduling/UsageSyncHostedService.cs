@@ -121,6 +121,9 @@ public sealed class UsageSyncHostedService : BackgroundService
             return;
         }
 
+        // 通知 UI 同步开始（显示进度条，避免误以为卡顿）
+        _messenger.Send(new SyncStartedMessage());
+
         try
         {
             var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -143,50 +146,78 @@ public sealed class UsageSyncHostedService : BackgroundService
             var entities = allEvents.Select(MapToEntity).ToList();
             var inserted = await _repository.UpsertUsageEventsAsync(entities, ct);
 
-            // 拉取计费周期汇总
+            // 拉取计费周期汇总（GET，字段基于实际抓包：billingCycleStart/planUsage）
             CursorPeriodUsageDto? periodDto = null;
             try
             {
                 periodDto = await _apiClient.GetCurrentPeriodUsageAsync(_options.SessionToken, ct);
-                if (periodDto is not null)
-                {
-                    await _repository.UpsertPeriodUsageAsync(MapToPeriodEntity(periodDto, nowMs), ct);
-                }
             }
-            catch (CursorApiException ex)
+            catch (CursorApiAuthException)
+            {
+                throw; // 401 向上抛，触发 cookie 失效通知
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "拉取计费周期汇总失败（不影响事件入库）");
             }
 
-            // 拉取订阅/账单信息（尝试 JSON API 端点，静默跳过失败）
-            SubscriptionEntity? sub = null;
+            // 并行拉取多个辅助 GET API：stripe 订阅 / 用户资料 / 计费周期 / 发票 / 会话
+            CursorStripeSubscriptionDto? stripeDto = null;
+            CursorUserProfileDto? profileDto = null;
+            CursorBillingCycleDto? cycleDto = null;
+            CursorInvoicesDto? invoicesDto = null;
+            CursorSessionsDto? sessionsDto = null;
             try
             {
-                var billingData = await _apiClient.GetBillingPageDataAsync(_options.SessionToken, ct);
-                if (billingData?.Props?.PageProps is { } pageProps)
-                {
-                    var subEntity = MapToSubscriptionEntity(pageProps, nowMs);
-                    await _repository.UpsertSubscriptionAsync(subEntity, ct);
-                    sub = subEntity;
-                }
+                stripeDto = await _apiClient.GetStripeSubscriptionAsync(_options.SessionToken, ct);
+                profileDto = await _apiClient.GetUserProfileAsync(_options.SessionToken, ct);
+                cycleDto = await _apiClient.GetBillingCycleAsync(_options.SessionToken, ct);
+                invoicesDto = await _apiClient.ListInvoicesAsync(_options.SessionToken, ct);
+                sessionsDto = await _apiClient.GetSessionsAsync(_options.SessionToken, ct);
+            }
+            catch (CursorApiAuthException)
+            {
+                throw; // 401 向上抛，触发 cookie 失效通知
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning(ex, "拉取账单页面数据失败（不影响事件入库）");
+                _logger.LogWarning(ex, "拉取订阅/账单辅助 API 失败（不影响事件入库）");
             }
 
-            // 用户信息（多数据源：事件表邮箱 > periodDto > billing 页面）
-            var userEmail = allEvents.FirstOrDefault(e => !string.IsNullOrWhiteSpace(e.UserEmail))?.UserEmail
-                            ?? periodDto?.Email
+            // cookie 过期检测：会话即将过期时通知 UI 提醒用户更新
+            CheckSessionExpiry(sessionsDto);
+
+            // period 实体入库（planName 取自 stripe.membershipType）
+            var planName = stripeDto?.MembershipType;
+            if (periodDto is not null)
+            {
+                await _repository.UpsertPeriodUsageAsync(MapToPeriodEntity(periodDto, nowMs, planName), ct);
+            }
+
+            // 订阅信息入库
+            SubscriptionEntity? sub = null;
+            if (stripeDto is not null || cycleDto is not null || invoicesDto is not null)
+            {
+                sub = MapToSubscriptionEntity(stripeDto, cycleDto, invoicesDto, profileDto, periodDto, nowMs);
+                await _repository.UpsertSubscriptionAsync(sub, ct);
+            }
+
+            // 用户信息（优先 profile.handle/displayName，其次事件表邮箱，再其次 subscription）
+            var userHandle = profileDto?.Profile?.Handle;
+            var userDisplay = profileDto?.Profile?.DisplayName;
+            var userEmail = userHandle
+                            ?? allEvents.FirstOrDefault(e => !string.IsNullOrWhiteSpace(e.UserEmail))?.UserEmail
                             ?? sub?.Email;
 
-            var planName = periodDto?.PlanName ?? sub?.Plan;
             if (userEmail is not null)
             {
                 await _repository.UpsertUserInfoAsync(new UserInfoEntity
                 {
                     Email = userEmail,
+                    Name = userDisplay ?? userHandle,
                     PlanName = planName,
+                    MonthlyLimitDollars = 0,
+                    HardLimitOverrideDollars = 0,
                     SnapshotTime = nowMs
                 }, ct);
             }
@@ -284,54 +315,107 @@ public sealed class UsageSyncHostedService : BackgroundService
         };
     }
 
-    private static PeriodUsageEntity MapToPeriodEntity(CursorPeriodUsageDto dto, long fetchMs)
+    private static PeriodUsageEntity MapToPeriodEntity(CursorPeriodUsageDto dto, long fetchMs, string? planName)
     {
         return new PeriodUsageEntity
         {
             FetchTime = fetchMs,
-            PeriodStart = dto.PeriodStart ?? 0,
-            PeriodEnd = dto.PeriodEnd ?? 0,
-            PlanName = dto.PlanName,
-            IncludedRequests = dto.IncludedRequests ?? 0,
-            UsedRequests = dto.UsedRequests ?? 0,
-            UsedTokens = dto.UsedTokens ?? 0,
-            TotalSpendCents = dto.TotalSpendCents ?? 0,
-            FastPremiumRequests = dto.FastPremiumRequests ?? 0,
-            RemainingRequests = dto.RemainingRequests ?? 0,
+            PeriodStart = dto.PeriodStartMs,
+            PeriodEnd = dto.PeriodEndMs,
+            // planName 来自 stripe.membershipType（period API 自身不含计划名）
+            PlanName = planName,
+            // 以下字段 period-usage API 不直接提供，由 events 聚合或留 0
+            IncludedRequests = 0,
+            UsedRequests = 0,
+            UsedTokens = 0,
+            TotalSpendCents = dto.TotalSpendCents,
+            FastPremiumRequests = 0,
+            // remaining 为剩余额度（美分），复用此字段展示
+            RemainingRequests = dto.RemainingCents,
             RawJson = JsonSerializer.Serialize(dto)
         };
     }
 
-    private static SubscriptionEntity MapToSubscriptionEntity(CursorBillingPagePropsData pageProps, long fetchMs)
+    /// <summary>
+    /// 将多个 GET API 响应合并映射为订阅实体。
+    /// 数据源优先级：billing-cycle（周期）> period-usage（周期/支出备用）> stripe（计划/状态）> invoices（发票数/起始）> profile（用户标识/账号创建）。
+    /// </summary>
+    private static SubscriptionEntity MapToSubscriptionEntity(
+        CursorStripeSubscriptionDto? stripe,
+        CursorBillingCycleDto? cycle,
+        CursorInvoicesDto? invoices,
+        CursorUserProfileDto? profile,
+        CursorPeriodUsageDto? period,
+        long fetchMs)
     {
-        var sub = pageProps.Subscription;
-        var invoices = pageProps.Invoices;
+        // 当前周期：优先 billing-cycle，其次 period-usage
+        var periodStart = cycle?.StartMs ?? period?.PeriodStartMs ?? 0;
+        var periodEnd = cycle?.EndMs ?? period?.PeriodEndMs ?? 0;
 
-        // 从最早发票推断订阅起始日期
-        var subStart = sub?.CurrentPeriodStart ?? 0;
-        if (invoices?.Count > 0)
+        // 订阅起始：取最早发票日期；无发票则用账号创建时间
+        var subStart = 0L;
+        if (invoices?.Invoices is { Count: > 0 })
         {
-            var earliestInvoice = invoices
-                .Where(i => i.PeriodStart.HasValue)
-                .MinBy(i => i.PeriodStart);
-            if (earliestInvoice?.PeriodStart > 0)
-                subStart = Math.Min(subStart, earliestInvoice.PeriodStart.Value);
+            var earliest = invoices.Invoices
+                .Where(i => i.DateMs > 0)
+                .MinBy(i => i.DateMs);
+            if (earliest?.DateMs > 0)
+                subStart = earliest.DateMs;
         }
+        if (subStart == 0 && !string.IsNullOrEmpty(profile?.Profile?.CreatedAt)
+            && DateTimeOffset.TryParse(profile.Profile.CreatedAt, out var created))
+        {
+            subStart = created.ToUnixTimeMilliseconds();
+        }
+
+        // 是否在周期结束时取消：stripe.pendingCancellationDate 非空表示已申请取消
+        var cancelAtPeriodEnd = !string.IsNullOrEmpty(stripe?.PendingCancellationDate);
 
         return new SubscriptionEntity
         {
             SnapshotTime = fetchMs,
-            Plan = sub?.Plan,
-            Status = sub?.Status,
-            CurrentPeriodStart = sub?.CurrentPeriodStart ?? 0,
-            CurrentPeriodEnd = sub?.CurrentPeriodEnd ?? 0,
-            TrialEnd = sub?.TrialEnd ?? 0,
-            CancelAtPeriodEnd = sub?.CancelAtPeriodEnd ?? false,
+            Plan = stripe?.MembershipType,
+            Status = stripe?.SubscriptionStatus,
+            CurrentPeriodStart = periodStart,
+            CurrentPeriodEnd = periodEnd,
+            TrialEnd = 0, // stripe 无试用结束时间字段（仅 TrialEligible/TrialLengthDays）
+            CancelAtPeriodEnd = cancelAtPeriodEnd,
             SubscriptionStart = subStart,
-            InvoiceCount = invoices?.Count ?? 0,
-            Email = pageProps.Team?.Email,
-            RawJson = JsonSerializer.Serialize(pageProps)
+            InvoiceCount = invoices?.Invoices?.Count ?? invoices?.Total ?? 0,
+            // 无 email API，用 profile.handle 作为用户标识
+            Email = profile?.Profile?.Handle,
+            RawJson = JsonSerializer.Serialize(new
+            {
+                stripe,
+                cycle,
+                invoices,
+                profile,
+                period
+            })
         };
+    }
+
+    /// <summary>
+    /// 检测会话过期时间，临近过期（7 天内）或已过期时通知 UI 提醒用户更新 cookie。
+    /// </summary>
+    private void CheckSessionExpiry(CursorSessionsDto? sessions)
+    {
+        if (sessions?.LatestWebSessionExpiryUtc is not { } expiryUtc)
+        {
+            return;
+        }
+
+        var remaining = expiryUtc - DateTime.UtcNow;
+        if (remaining <= TimeSpan.Zero)
+        {
+            _logger.LogWarning("Cursor session 已过期（ expiry {Expiry}），请更新 cookie", expiryUtc);
+            _messenger.Send(new CookieExpiringSoonMessage(expiryUtc, IsExpired: true));
+        }
+        else if (remaining <= TimeSpan.FromDays(7))
+        {
+            _logger.LogWarning("Cursor session 将在 {Days} 天后过期（{Expiry}）", (int)remaining.TotalDays, expiryUtc);
+            _messenger.Send(new CookieExpiringSoonMessage(expiryUtc, IsExpired: false));
+        }
     }
 
     /// <summary>

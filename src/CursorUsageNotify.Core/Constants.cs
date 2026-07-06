@@ -11,15 +11,20 @@ public static class Constants
     /// <summary>Cursor 内部 dashboard 接口：当前计费周期汇总。</summary>
     public const string CurrentPeriodUsagePath = "/api/dashboard/get-current-period-usage";
 
-    /// <summary>订阅/团队信息 API 端点（多个备选）。</summary>
-    public static readonly string[] TeamApiEndpoints =
-    {
-        "/api/dashboard/get-team",
-        "/api/dashboard/subscription",
-        "/api/team",
-        "/api/user",
-        "/api/organization"
-    };
+    /// <summary>Stripe 订阅信息（计划/状态/自动续费等）。GET。</summary>
+    public const string StripeSubscriptionPath = "/api/auth/stripe";
+
+    /// <summary>用户资料（handle/displayName/avatar/createdAt）。GET。</summary>
+    public const string UserProfilePath = "/api/dashboard/get-user-profile";
+
+    /// <summary>当前计费周期起止时间。GET。</summary>
+    public const string BillingCyclePath = "/api/dashboard/get-current-billing-cycle";
+
+    /// <summary>发票列表。GET。</summary>
+    public const string ListInvoicesPath = "/api/dashboard/list-invoices";
+
+    /// <summary>会话列表（用于检测 cookie/session 过期时间）。GET。</summary>
+    public const string SessionsPath = "/api/auth/sessions";
 
     /// <summary>用于认证的 Cookie 名称（用户从浏览器 F12 复制）。</summary>
     public const string SessionCookieName = "WorkosCursorSessionToken";

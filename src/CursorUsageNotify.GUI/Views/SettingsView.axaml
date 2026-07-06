@@ -36,6 +36,8 @@
                                 IsEnabled="{Binding !IsTesting}"/>
                         <Button Content="立即拉取一次"
                                 Command="{Binding SyncNowCommand}"/>
+                        <Button Content="打开浏览器登录 Cursor"
+                                Command="{Binding OpenBrowserCommand}"/>
                     </StackPanel>
 
                     <TextBlock Text="{Binding TestResult}"

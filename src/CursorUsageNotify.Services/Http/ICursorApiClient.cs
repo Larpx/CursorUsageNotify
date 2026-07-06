@@ -6,23 +6,14 @@ namespace CursorUsageNotify.Services.Http;
 
 /// <summary>
 /// Cursor 内部 dashboard API 客户端抽象。
+/// 端点结构基于 2026-07 实际抓包验证：除 usage-events 为 POST 外，其余均为 GET JSON API。
 /// </summary>
 public interface ICursorApiClient
 {
     /// <summary>测试连接是否可用（拉取 1 条事件验证 token 有效性）。</summary>
-    /// <param name="sessionToken">WorkosCursorSessionToken。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>成功时返回拉取到的事件数；失败时返回错误消息。</returns>
     Task<Result<int>> TestConnectionAsync(string sessionToken, CancellationToken ct = default);
 
-    /// <summary>
-    /// 分页拉取详细用量事件。
-    /// </summary>
-    /// <param name="sessionToken">WorkosCursorSessionToken。</param>
-    /// <param name="page">页码（1 起始）。</param>
-    /// <param name="pageSize">每页大小。</param>
-    /// <param name="startTimestamp">起始时间戳（epoch 毫秒，0 表示从最早开始）。</param>
-    /// <param name="ct">取消令牌。</param>
+    /// <summary>分页拉取详细用量事件（POST /api/dashboard/get-filtered-usage-events）。</summary>
     Task<CursorUsageEventsResponse> GetFilteredUsageEventsAsync(
         string sessionToken,
         int page = 1,
@@ -30,18 +21,21 @@ public interface ICursorApiClient
         long startTimestamp = 0,
         CancellationToken ct = default);
 
-    /// <summary>
-    /// 拉取当前计费周期用量汇总。
-    /// </summary>
-    /// <param name="sessionToken">WorkosCursorSessionToken。</param>
-    /// <param name="ct">取消令牌。</param>
+    /// <summary>当前计费周期用量汇总（GET /api/dashboard/get-current-period-usage）。</summary>
     Task<CursorPeriodUsageDto> GetCurrentPeriodUsageAsync(string sessionToken, CancellationToken ct = default);
 
-    /// <summary>
-    /// 抓取 /dashboard/billing 页面，解析 Next.js __NEXT_DATA__ JSON 获取订阅/账单信息。
-    /// </summary>
-    /// <param name="sessionToken">WorkosCursorSessionToken。</param>
-    /// <param name="ct">取消令牌。</param>
-    /// <returns>解析后的账单页数据；失败时抛出 <see cref="CursorApiException"/>。</returns>
-    Task<CursorBillingPageData> GetBillingPageDataAsync(string sessionToken, CancellationToken ct = default);
+    /// <summary>Stripe 订阅信息（GET /api/auth/stripe）：计划、状态、自动续费。</summary>
+    Task<CursorStripeSubscriptionDto> GetStripeSubscriptionAsync(string sessionToken, CancellationToken ct = default);
+
+    /// <summary>用户资料（GET /api/dashboard/get-user-profile）：handle、displayName、createdAt。</summary>
+    Task<CursorUserProfileDto> GetUserProfileAsync(string sessionToken, CancellationToken ct = default);
+
+    /// <summary>当前计费周期起止（GET /api/dashboard/get-current-billing-cycle）。</summary>
+    Task<CursorBillingCycleDto> GetBillingCycleAsync(string sessionToken, CancellationToken ct = default);
+
+    /// <summary>发票列表（GET /api/dashboard/list-invoices）。</summary>
+    Task<CursorInvoicesDto> ListInvoicesAsync(string sessionToken, CancellationToken ct = default);
+
+    /// <summary>会话列表（GET /api/auth/sessions），用于检测 cookie 过期时间。</summary>
+    Task<CursorSessionsDto> GetSessionsAsync(string sessionToken, CancellationToken ct = default);
 }
