@@ -1,11 +1,13 @@
 using System.Text.Json;
 using CommunityToolkit.Mvvm.Messaging;
 using CursorUsageNotify.Core;
+using CursorUsageNotify.Core.Configuration;
 using CursorUsageNotify.Models.Dtos;
 using CursorUsageNotify.Models.Entities;
 using CursorUsageNotify.Services.Http;
 using CursorUsageNotify.Services.Messages;
 using CursorUsageNotify.Services.Notifications;
+using CursorUsageNotify.Services.Security;
 using CursorUsageNotify.Services.Storage;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -23,6 +25,8 @@ public sealed class UsageSyncHostedService : BackgroundService
     private readonly INotificationService _notification;
     private readonly IMessenger _messenger;
     private readonly UsageSyncOptions _options;
+    private readonly TokenProtector _protector;
+    private readonly AppSettings _settings;
     private readonly ILogger<UsageSyncHostedService> _logger;
 
     public UsageSyncHostedService(
@@ -31,6 +35,8 @@ public sealed class UsageSyncHostedService : BackgroundService
         INotificationService notification,
         IMessenger messenger,
         UsageSyncOptions options,
+        TokenProtector protector,
+        AppSettings settings,
         ILogger<UsageSyncHostedService> logger)
     {
         _apiClient = apiClient;
@@ -38,6 +44,8 @@ public sealed class UsageSyncHostedService : BackgroundService
         _notification = notification;
         _messenger = messenger;
         _options = options;
+        _protector = protector;
+        _settings = settings;
         _logger = logger;
     }
 
@@ -45,6 +53,9 @@ public sealed class UsageSyncHostedService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("用量同步服务已启动");
+
+        // 启动时从 secrets.dat 加载已保存的 token
+        await LoadSavedTokenAsync();
 
         // 订阅托盘指令
         _messenger.Register<ToggleSyncMessage>(this, (_, m) => _options.IsRunning = m.IsRunning);
@@ -147,18 +158,8 @@ public sealed class UsageSyncHostedService : BackgroundService
                 _logger.LogWarning(ex, "拉取计费周期汇总失败（不影响事件入库）");
             }
 
-            // 用户信息（从 periodDto 推断）
-            if (periodDto?.Email is not null)
-            {
-                await _repository.UpsertUserInfoAsync(new UserInfoEntity
-                {
-                    Email = periodDto.Email,
-                    PlanName = periodDto.PlanName,
-                    SnapshotTime = nowMs
-                }, ct);
-            }
-
-            // 拉取订阅/账单信息（从 /dashboard/billing 页面解析）
+            // 拉取订阅/账单信息（尝试 JSON API 端点，静默跳过失败）
+            SubscriptionEntity? sub = null;
             try
             {
                 var billingData = await _apiClient.GetBillingPageDataAsync(_options.SessionToken, ct);
@@ -166,11 +167,28 @@ public sealed class UsageSyncHostedService : BackgroundService
                 {
                     var subEntity = MapToSubscriptionEntity(pageProps, nowMs);
                     await _repository.UpsertSubscriptionAsync(subEntity, ct);
+                    sub = subEntity;
                 }
             }
-            catch (CursorApiException ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "拉取账单页面数据失败（不影响事件入库）");
+            }
+
+            // 用户信息（多数据源：事件表邮箱 > periodDto > billing 页面）
+            var userEmail = allEvents.FirstOrDefault(e => !string.IsNullOrWhiteSpace(e.UserEmail))?.UserEmail
+                            ?? periodDto?.Email
+                            ?? sub?.Email;
+
+            var planName = periodDto?.PlanName ?? sub?.Plan;
+            if (userEmail is not null)
+            {
+                await _repository.UpsertUserInfoAsync(new UserInfoEntity
+                {
+                    Email = userEmail,
+                    PlanName = planName,
+                    SnapshotTime = nowMs
+                }, ct);
             }
 
             _options.LastSyncTimeMs = nowMs;
@@ -178,7 +196,22 @@ public sealed class UsageSyncHostedService : BackgroundService
             var latestPeriod = await _repository.GetLatestPeriodUsageAsync(ct);
             var latestUser = await _repository.GetLatestUserInfoAsync(ct);
             var latestSub = await _repository.GetLatestSubscriptionAsync(ct);
-            _messenger.Send(new UsageDataFetchedMessage(inserted, latestPeriod, latestUser, latestSub, nowMs));
+
+            // 按订阅周期从 events 表聚合统计
+            var aggPeriodStart = latestSub?.CurrentPeriodStart
+                                 ?? latestPeriod?.PeriodStart
+                                 ?? allEvents.MinBy(e => e.TryGetTimestampMs())?.TryGetTimestampMs()
+                                 ?? 0;
+            var aggPeriodEnd = latestSub?.CurrentPeriodEnd
+                               ?? latestPeriod?.PeriodEnd
+                               ?? allEvents.MaxBy(e => e.TryGetTimestampMs())?.TryGetTimestampMs()
+                               ?? 0;
+
+            var aggStats = aggPeriodStart > 0 && aggPeriodEnd > 0
+                ? await _repository.AggregateStatsAsync(aggPeriodStart, aggPeriodEnd, ct)
+                : null;
+
+            _messenger.Send(new UsageDataFetchedMessage(inserted, latestPeriod, latestUser, latestSub, aggStats, nowMs));
 
             _logger.LogInformation("同步完成：拉取 {Total} 条事件，入库 {Inserted} 条", allEvents.Count, inserted);
         }
@@ -299,5 +332,30 @@ public sealed class UsageSyncHostedService : BackgroundService
             Email = pageProps.Team?.Email,
             RawJson = JsonSerializer.Serialize(pageProps)
         };
+    }
+
+    /// <summary>
+    /// 从 secrets.dat 加载已保存的 token 到 _options.SessionToken。
+    /// 确保 sync 服务启动时 token 已可用，不依赖 ViewModel 的生命周期。
+    /// </summary>
+    private async Task LoadSavedTokenAsync()
+    {
+        try
+        {
+            if (!File.Exists(_settings.SecretsPath))
+                return;
+
+            var cipher = await File.ReadAllBytesAsync(_settings.SecretsPath);
+            var plain = _protector.Decrypt(cipher);
+            if (!string.IsNullOrEmpty(plain))
+            {
+                _options.SessionToken = plain;
+                _logger.LogInformation("已从 secrets.dat 加载 session token");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "从 secrets.dat 加载 token 失败（不影响后续手动输入）");
+        }
     }
 }

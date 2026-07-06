@@ -36,6 +36,8 @@ public sealed class CentsToCurrencyConverter : IValueConverter
     /// <inheritdoc/>
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        throw new NotSupportedException("CentsToCurrencyConverter 不支持反向转换。");
+        // 只读列（IsReadOnly + Mode=OneWay），实际不会写入；
+        // Avalonia DataGrid 渲染时仍会调用 ConvertBack，静默忽略。
+        return value;
     }
 }

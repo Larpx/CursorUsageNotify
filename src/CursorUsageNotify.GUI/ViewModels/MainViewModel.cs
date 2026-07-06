@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
+using CursorUsageNotify.Models.Dtos;
 using CursorUsageNotify.Models.Entities;
 using CursorUsageNotify.Services.Messages;
 using CursorUsageNotify.Services.Storage;
@@ -84,25 +85,60 @@ public sealed partial class MainViewModel : ViewModelBase
         var period = msg?.LatestPeriod ?? await _repository.GetLatestPeriodUsageAsync();
         var user = msg?.LatestUser ?? await _repository.GetLatestUserInfoAsync();
         var sub = msg?.LatestSubscription ?? await _repository.GetLatestSubscriptionAsync();
+        var agg = msg?.AggregateStats;
 
+        // 如果消息中没有聚合数据，尝试按当前周期自行查询
+        if (agg is null && sub is not null && sub.CurrentPeriodStart > 0 && sub.CurrentPeriodEnd > 0)
+        {
+            agg = await _repository.AggregateStatsAsync(sub.CurrentPeriodStart, sub.CurrentPeriodEnd);
+        }
+
+        // 用户信息：优先 user_info 表，其次事件表聚合，再其次 subscription
         if (user is not null)
         {
             UserEmail = string.IsNullOrEmpty(user.Email) ? "未知" : user.Email;
             PlanName = user.PlanName ?? "未知";
         }
+        else if (agg?.UserEmail is not null)
+        {
+            UserEmail = agg.UserEmail;
+            PlanName = sub?.Plan ?? period?.PlanName ?? "未知";
+        }
+        else
+        {
+            UserEmail = sub?.Email ?? "未知";
+            PlanName = sub?.Plan ?? "未知";
+        }
 
-        if (period is not null)
+        // 订阅周期：优先 subscription 实体，其次 period entity
+        var periodStart = sub?.CurrentPeriodStart ?? period?.PeriodStart ?? 0;
+        var periodEnd = sub?.CurrentPeriodEnd ?? period?.PeriodEnd ?? 0;
+
+        if (periodStart > 0 && periodEnd > 0)
+        {
+            var start = DateTimeOffset.FromUnixTimeMilliseconds(periodStart).LocalDateTime;
+            var end = DateTimeOffset.FromUnixTimeMilliseconds(periodEnd).LocalDateTime;
+            PeriodRange = $"{start:yyyy-MM-dd} ~ {end:yyyy-MM-dd}";
+        }
+
+        // 用量统计：优先 events 表聚合数据，其次 API 快照
+        if (agg is not null && (agg.TotalTokens > 0 || agg.TotalRequests > 0))
+        {
+            UsedTokens = agg.TotalTokens;
+            UsedRequests = agg.TotalRequests;
+            TotalSpendDollars = agg.TotalSpendCents / 100m;
+        }
+        else if (period is not null)
         {
             UsedTokens = period.UsedTokens;
             UsedRequests = period.UsedRequests;
             TotalSpendDollars = period.TotalSpendCents / 100m;
-            RemainingRequests = period.RemainingRequests;
-
-            var start = DateTimeOffset.FromUnixTimeMilliseconds(period.PeriodStart).LocalDateTime;
-            var end = DateTimeOffset.FromUnixTimeMilliseconds(period.PeriodEnd).LocalDateTime;
-            PeriodRange = $"{start:yyyy-MM-dd} ~ {end:yyyy-MM-dd}";
         }
 
+        // 剩余请求：仅来自 API 快照
+        RemainingRequests = period?.RemainingRequests ?? 0;
+
+        // 订阅信息（从 billing 页面获取）
         if (sub is not null)
         {
             if (sub.SubscriptionStart > 0)

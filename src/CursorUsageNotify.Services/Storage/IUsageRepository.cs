@@ -1,4 +1,5 @@
 using CursorUsageNotify.Core;
+using CursorUsageNotify.Models.Dtos;
 using CursorUsageNotify.Models.Entities;
 
 namespace CursorUsageNotify.Services.Storage;
@@ -65,4 +66,17 @@ public interface IUsageRepository
     /// 获取最近一条订阅信息。
     /// </summary>
     Task<SubscriptionEntity?> GetLatestSubscriptionAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// 按时间范围聚合统计用量（从 usage_events 表求和 token、请求数、支出）。
+    /// </summary>
+    /// <param name="periodStart">起始时间（epoch 毫秒）。</param>
+    /// <param name="periodEnd">结束时间（epoch 毫秒）。</param>
+    /// <param name="ct">取消令牌。</param>
+    Task<UsageAggregateStats> AggregateStatsAsync(long periodStart, long periodEnd, CancellationToken ct = default);
+
+    /// <summary>
+    /// 获取范围内第一条事件的用户邮箱（用于推断账号信息）。
+    /// </summary>
+    Task<string?> GetFirstUserEmailAsync(CancellationToken ct = default);
 }

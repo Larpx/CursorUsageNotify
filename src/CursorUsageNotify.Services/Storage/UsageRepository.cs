@@ -1,4 +1,5 @@
 using CursorUsageNotify.Core;
+using CursorUsageNotify.Models.Dtos;
 using CursorUsageNotify.Models.Entities;
 using Microsoft.Extensions.Logging;
 using SqlSugar;
@@ -162,5 +163,39 @@ public sealed class UsageRepository : IUsageRepository
         return await _db.Queryable<SubscriptionEntity>()
             .OrderBy(e => e.SnapshotTime, OrderByType.Desc)
             .FirstAsync(ct);
+    }
+
+    /// <inheritdoc/>
+    public async Task<UsageAggregateStats> AggregateStatsAsync(long periodStart, long periodEnd, CancellationToken ct = default)
+    {
+        if (periodStart <= 0 || periodEnd <= 0 || periodStart >= periodEnd)
+        {
+            return new UsageAggregateStats { PeriodStart = periodStart, PeriodEnd = periodEnd };
+        }
+
+        var events = await _db.Queryable<UsageEventEntity>()
+            .Where(e => e.Timestamp >= periodStart && e.Timestamp <= periodEnd)
+            .ToListAsync(ct);
+
+        return new UsageAggregateStats
+        {
+            TotalTokens = events.Sum(e => e.InputTokens + e.OutputTokens),
+            TotalRequests = events.Count,
+            TotalSpendCents = events.Sum(e => e.ChargedCents),
+            TokenBasedRequests = events.Count(e => e.IsTokenBasedCall),
+            CostBasedRequests = events.Count(e => !e.IsTokenBasedCall),
+            PeriodStart = periodStart,
+            PeriodEnd = periodEnd,
+            UserEmail = events.FirstOrDefault(e => !string.IsNullOrEmpty(e.UserEmail))?.UserEmail
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task<string?> GetFirstUserEmailAsync(CancellationToken ct = default)
+    {
+        var first = await _db.Queryable<UsageEventEntity>()
+            .OrderBy(e => e.Timestamp, OrderByType.Asc)
+            .FirstAsync(ct);
+        return first?.UserEmail;
     }
 }

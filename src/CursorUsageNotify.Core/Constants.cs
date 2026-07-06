@@ -11,6 +11,16 @@ public static class Constants
     /// <summary>Cursor 内部 dashboard 接口：当前计费周期汇总。</summary>
     public const string CurrentPeriodUsagePath = "/api/dashboard/get-current-period-usage";
 
+    /// <summary>订阅/团队信息 API 端点（多个备选）。</summary>
+    public static readonly string[] TeamApiEndpoints =
+    {
+        "/api/dashboard/get-team",
+        "/api/dashboard/subscription",
+        "/api/team",
+        "/api/user",
+        "/api/organization"
+    };
+
     /// <summary>用于认证的 Cookie 名称（用户从浏览器 F12 复制）。</summary>
     public const string SessionCookieName = "WorkosCursorSessionToken";
 

@@ -63,7 +63,7 @@
                   HeadersVisibility="Column">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="时间"
-                                    Binding="{Binding Timestamp, Converter={StaticResource EpochToDate}}"
+                                    Binding="{Binding Timestamp, Converter={StaticResource EpochToDate}, Mode=OneWay}"
                                     MinWidth="160"/>
                 <DataGridTextColumn Header="模型" Binding="{Binding Model}" MinWidth="160"/>
                 <DataGridTextColumn Header="输入 Token" Binding="{Binding InputTokens, StringFormat=\{0:N0\}}"/>
@@ -71,7 +71,7 @@
                 <DataGridTextColumn Header="缓存读" Binding="{Binding CacheReadTokens, StringFormat=\{0:N0\}}"/>
                 <DataGridTextColumn Header="缓存写" Binding="{Binding CacheWriteTokens, StringFormat=\{0:N0\}}"/>
                 <DataGridTextColumn Header="费用"
-                                    Binding="{Binding TotalCents, Converter={StaticResource CentsToCurrency}}"/>
+                                    Binding="{Binding TotalCents, Converter={StaticResource CentsToCurrency}, Mode=OneWay}"/>
                 <DataGridCheckBoxColumn Header="Max" Binding="{Binding MaxMode}"/>
                 <DataGridCheckBoxColumn Header="Headless" Binding="{Binding IsHeadless}"/>
             </DataGrid.Columns>

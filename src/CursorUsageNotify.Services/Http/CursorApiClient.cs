@@ -95,52 +95,39 @@ public sealed class CursorApiClient : ICursorApiClient
     /// <inheritdoc/>
     public async Task<CursorBillingPageData> GetBillingPageDataAsync(string sessionToken, CancellationToken ct = default)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/dashboard/billing");
-        ApplyHeaders(request, sessionToken);
+        // 尝试多个 JSON API 端点获取订阅/团队信息，不再解析 HTML
+        var exceptions = new List<Exception>();
 
-        using var response = await _httpClient.SendAsync(request, ct);
-        var html = await response.Content.ReadAsStringAsync(ct);
-
-        if (!response.IsSuccessStatusCode)
+        foreach (var endpoint in Constants.TeamApiEndpoints)
         {
-            HandleError(response.StatusCode, html);
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+                ApplyHeaders(request, sessionToken);
+                request.Content = new StringContent("{}", Encoding.UTF8);
+                request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+                using var response = await _httpClient.SendAsync(request, ct);
+                var body = await response.Content.ReadAsStringAsync(ct);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var data = JsonSerializer.Deserialize<CursorBillingPageData>(body, JsonOptions);
+                    if (data?.Props?.PageProps is not null || data?.Props is not null)
+                        return data;
+                    if (data?.Page is not null)
+                        return data;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                exceptions.Add(ex);
+            }
         }
 
-        return ParseBillingPageHtml(html);
-    }
-
-    /// <summary>
-    /// 从 HTML 中提取 __NEXT_DATA__ JSON 块并反序列化。
-    /// </summary>
-    private static CursorBillingPageData ParseBillingPageHtml(string html)
-    {
-        const string marker = "__NEXT_DATA__\" type=\"application/json\">";
-        var start = html.IndexOf(marker, StringComparison.Ordinal);
-        if (start < 0)
-        {
-            // 备用匹配模式
-            const string altMarker = "__NEXT_DATA__\" type=\"application/json\"";
-            start = html.IndexOf(altMarker, StringComparison.Ordinal);
-            if (start < 0)
-                throw new CursorApiException("未找到 __NEXT_DATA__ 脚本块，页面结构可能已变更");
-            start = html.IndexOf('>', start) + 1;
-        }
-        else
-        {
-            start += marker.Length;
-        }
-
-        var end = html.IndexOf("</script>", start, StringComparison.Ordinal);
-        if (end < 0)
-            throw new CursorApiException("__NEXT_DATA__ 脚本块未闭合");
-
-        var json = html[start..end];
-
-        var result = JsonSerializer.Deserialize<CursorBillingPageData>(json, JsonOptions);
-        if (result is null)
-            throw new CursorApiException("__NEXT_DATA__ JSON 反序列化失败");
-
-        return result;
+        // 如果所有 API 端点都失败，返回空数据（静默跳过，不影响主流程）
+        _logger.LogWarning("所有订阅信息 API 端点均失败（{Count} 个），跳过 billing 数据拉取", exceptions.Count);
+        return new CursorBillingPageData();
     }
 
     private async Task<T> SendAsync<T>(string sessionToken, string path, object body, CancellationToken ct)

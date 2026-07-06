@@ -1,3 +1,4 @@
+using CursorUsageNotify.Models.Dtos;
 using CursorUsageNotify.Models.Entities;
 
 namespace CursorUsageNotify.Services.Messages;
@@ -9,12 +10,14 @@ namespace CursorUsageNotify.Services.Messages;
 /// <param name="LatestPeriod">最新的计费周期汇总。</param>
 /// <param name="LatestUser">最新的用户信息。</param>
 /// <param name="LatestSubscription">最新的订阅信息（含起始日期等）。</param>
+/// <param name="AggregateStats">从 usage_events 表按订阅周期聚合的统计数据。</param>
 /// <param name="FetchTimestampMs">拉取时间戳（epoch 毫秒）。</param>
 public sealed record UsageDataFetchedMessage(
     int NewEventsCount,
     PeriodUsageEntity? LatestPeriod,
     UserInfoEntity? LatestUser,
     SubscriptionEntity? LatestSubscription,
+    UsageAggregateStats? AggregateStats,
     long FetchTimestampMs);
 
 /// <summary>
