@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug (GUI)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/CursorUsageNotify.GUI/bin/Debug/net10.0-windows10.0.18362.0/CursorUsageNotify.GUI.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/CursorUsageNotify.GUI",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "env": {
+                "DOTNET_ENVIRONMENT": "Development"
+            },
+            "sourceFileMap": {
+                "/Views": "${workspaceFolder}/src/CursorUsageNotify.GUI/Views"
+            }
+        },
+        {
+            "name": "Debug (Tests)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "dotnet",
+            "args": [
+                "test",
+                "${workspaceFolder}/src/CursorUsageNotify.Tests/CursorUsageNotify.Tests.csproj",
+                "--no-build",
+                "-v",
+                "n"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "console": "internalConsole"
+        }
+    ]
+}

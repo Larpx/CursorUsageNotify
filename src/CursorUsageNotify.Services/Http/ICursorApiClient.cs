@@ -36,4 +36,12 @@ public interface ICursorApiClient
     /// <param name="sessionToken">WorkosCursorSessionToken。</param>
     /// <param name="ct">取消令牌。</param>
     Task<CursorPeriodUsageDto> GetCurrentPeriodUsageAsync(string sessionToken, CancellationToken ct = default);
+
+    /// <summary>
+    /// 抓取 /dashboard/billing 页面，解析 Next.js __NEXT_DATA__ JSON 获取订阅/账单信息。
+    /// </summary>
+    /// <param name="sessionToken">WorkosCursorSessionToken。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>解析后的账单页数据；失败时抛出 <see cref="CursorApiException"/>。</returns>
+    Task<CursorBillingPageData> GetBillingPageDataAsync(string sessionToken, CancellationToken ct = default);
 }

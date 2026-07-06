@@ -47,7 +47,8 @@ public sealed class DbContext : IDbContext
             _client.CodeFirst.InitTables(
                 typeof(UsageEventEntity),
                 typeof(PeriodUsageEntity),
-                typeof(UserInfoEntity));
+                typeof(UserInfoEntity),
+                typeof(SubscriptionEntity));
             _logger.LogInformation("数据库表结构初始化完成");
         }
         catch (Exception ex)

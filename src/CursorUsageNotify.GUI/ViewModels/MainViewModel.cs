@@ -54,6 +54,17 @@ public sealed partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private string _statusText = "等待中";
 
+    // 订阅信息
+
+    [ObservableProperty]
+    private string _subStartDate = "-";
+
+    [ObservableProperty]
+    private string _subStatus = "-";
+
+    [ObservableProperty]
+    private string _invoiceCount = "-";
+
     private void OnDataFetched(object recipient, UsageDataFetchedMessage msg)
     {
         _ = LoadAsync(msg);
@@ -72,6 +83,7 @@ public sealed partial class MainViewModel : ViewModelBase
     {
         var period = msg?.LatestPeriod ?? await _repository.GetLatestPeriodUsageAsync();
         var user = msg?.LatestUser ?? await _repository.GetLatestUserInfoAsync();
+        var sub = msg?.LatestSubscription ?? await _repository.GetLatestSubscriptionAsync();
 
         if (user is not null)
         {
@@ -89,6 +101,25 @@ public sealed partial class MainViewModel : ViewModelBase
             var start = DateTimeOffset.FromUnixTimeMilliseconds(period.PeriodStart).LocalDateTime;
             var end = DateTimeOffset.FromUnixTimeMilliseconds(period.PeriodEnd).LocalDateTime;
             PeriodRange = $"{start:yyyy-MM-dd} ~ {end:yyyy-MM-dd}";
+        }
+
+        if (sub is not null)
+        {
+            if (sub.SubscriptionStart > 0)
+            {
+                var subStart = DateTimeOffset.FromUnixTimeMilliseconds(sub.SubscriptionStart).LocalDateTime;
+                SubStartDate = $"{subStart:yyyy-MM-dd}";
+            }
+            SubStatus = sub.Status switch
+            {
+                "active" => "活跃",
+                "trialing" => "试用中",
+                "canceled" => "已取消",
+                "past_due" => "逾期",
+                null => "-",
+                var s => s
+            };
+            InvoiceCount = sub.InvoiceCount > 0 ? $"{sub.InvoiceCount} 张" : "-";
         }
 
         if (msg is not null)

@@ -37,8 +37,8 @@ public sealed class UsageRepositoryTests : IDisposable
         await _repository.UpsertUsageEventsAsync(events);
 
         // 用实际入库行数验证，不依赖 Storageable 返回值语义
-        var all = await _repository.QueryEventsAsync();
-        Assert.Equal(3, all.Count);
+        var all = await _repository.QueryEventsPagedAsync(pageSize: 100);
+        Assert.Equal(3, all.Items.Count);
     }
 
     [Fact]
@@ -50,9 +50,9 @@ public sealed class UsageRepositoryTests : IDisposable
         await _repository.UpsertUsageEventsAsync(new[] { first });
         await _repository.UpsertUsageEventsAsync(new[] { duplicate });
 
-        var all = await _repository.QueryEventsAsync();
-        Assert.Single(all);
-        Assert.Equal("model-b", all[0].Model); // 被更新为新值
+        var all = await _repository.QueryEventsPagedAsync(pageSize: 100);
+        Assert.Single(all.Items);
+        Assert.Equal("model-b", all.Items[0].Model); // 被更新为新值
     }
 
     [Fact]
@@ -65,10 +65,10 @@ public sealed class UsageRepositoryTests : IDisposable
             CreateEvent(3000, "a@x.com")
         });
 
-        var result = await _repository.QueryEventsAsync(startTime: 1500, endTime: 2500);
+        var result = await _repository.QueryEventsPagedAsync(startTime: 1500, endTime: 2500);
 
-        Assert.Single(result);
-        Assert.Equal(2000, result[0].Timestamp);
+        Assert.Single(result.Items);
+        Assert.Equal(2000, result.Items[0].Timestamp);
     }
 
     [Fact]
@@ -99,8 +99,8 @@ public sealed class UsageRepositoryTests : IDisposable
 
         await _repository.ClearAllAsync();
 
-        var all = await _repository.QueryEventsAsync();
-        Assert.Empty(all);
+        var all = await _repository.QueryEventsPagedAsync(pageSize: 100);
+        Assert.Empty(all.Items);
     }
 
     private static UsageEventEntity CreateEvent(long timestamp, string email, string? model = null)

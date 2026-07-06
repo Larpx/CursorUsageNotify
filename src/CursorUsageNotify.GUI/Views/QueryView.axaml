@@ -29,15 +29,28 @@
                           SelectedItem="{Binding SelectedModel}"
                           PlaceholderText="全部"
                           MinWidth="160"/>
+                <Button Content="重置" Command="{Binding ResetModelCommand}" ToolTip.Tip="取消模型筛选，显示全部"/>
 
                 <Button Content="查询" Command="{Binding LoadCommand}"/>
                 <Button Content="导出 CSV" Command="{Binding ExportCsvCommand}"/>
             </StackPanel>
         </Border>
 
-        <!-- 状态栏 -->
-        <Border DockPanel.Dock="Bottom" Padding="16,8" Background="#FFF3F4F6" BorderBrush="#FFE5E7EB" BorderThickness="0,1,0,0">
-            <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#FF4B5563"/>
+        <!-- 底部：分页导航 + 状态 -->
+        <Border DockPanel.Dock="Bottom" Padding="12,6" Background="#FFF3F4F6" BorderBrush="#FFE5E7EB" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                <TextBlock Text="{Binding PageSummary}" FontSize="12" Foreground="#FF4B5563" VerticalAlignment="Center"/>
+                <Button Content="◀ 上一页"
+                        Command="{Binding GoPrevCommand}"
+                        IsEnabled="{Binding CanGoPrev}"
+                        FontSize="12"
+                        Padding="8,2"/>
+                <Button Content="下一页 ▶"
+                        Command="{Binding GoNextCommand}"
+                        IsEnabled="{Binding CanGoNext}"
+                        FontSize="12"
+                        Padding="8,2"/>
+            </StackPanel>
         </Border>
 
         <!-- DataGrid -->

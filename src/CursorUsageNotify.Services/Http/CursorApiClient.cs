@@ -92,6 +92,57 @@ public sealed class CursorApiClient : ICursorApiClient
             ct);
     }
 
+    /// <inheritdoc/>
+    public async Task<CursorBillingPageData> GetBillingPageDataAsync(string sessionToken, CancellationToken ct = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/dashboard/billing");
+        ApplyHeaders(request, sessionToken);
+
+        using var response = await _httpClient.SendAsync(request, ct);
+        var html = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            HandleError(response.StatusCode, html);
+        }
+
+        return ParseBillingPageHtml(html);
+    }
+
+    /// <summary>
+    /// 从 HTML 中提取 __NEXT_DATA__ JSON 块并反序列化。
+    /// </summary>
+    private static CursorBillingPageData ParseBillingPageHtml(string html)
+    {
+        const string marker = "__NEXT_DATA__\" type=\"application/json\">";
+        var start = html.IndexOf(marker, StringComparison.Ordinal);
+        if (start < 0)
+        {
+            // 备用匹配模式
+            const string altMarker = "__NEXT_DATA__\" type=\"application/json\"";
+            start = html.IndexOf(altMarker, StringComparison.Ordinal);
+            if (start < 0)
+                throw new CursorApiException("未找到 __NEXT_DATA__ 脚本块，页面结构可能已变更");
+            start = html.IndexOf('>', start) + 1;
+        }
+        else
+        {
+            start += marker.Length;
+        }
+
+        var end = html.IndexOf("</script>", start, StringComparison.Ordinal);
+        if (end < 0)
+            throw new CursorApiException("__NEXT_DATA__ 脚本块未闭合");
+
+        var json = html[start..end];
+
+        var result = JsonSerializer.Deserialize<CursorBillingPageData>(json, JsonOptions);
+        if (result is null)
+            throw new CursorApiException("__NEXT_DATA__ JSON 反序列化失败");
+
+        return result;
+    }
+
     private async Task<T> SendAsync<T>(string sessionToken, string path, object body, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, path);

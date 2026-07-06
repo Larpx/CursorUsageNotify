@@ -1,3 +1,4 @@
+using CursorUsageNotify.Core;
 using CursorUsageNotify.Models.Entities;
 
 namespace CursorUsageNotify.Services.Storage;
@@ -28,8 +29,12 @@ public interface IUsageRepository
     /// <param name="startTime">起始时间（epoch 毫秒，0 表示不限）。</param>
     /// <param name="endTime">结束时间（epoch 毫秒，0 表示不限）。</param>
     /// <param name="model">模型筛选（null 表示不限）。</param>
+    /// <param name="pageIndex">页码（从 1 开始）。</param>
+    /// <param name="pageSize">每页大小。</param>
     /// <param name="ct">取消令牌。</param>
-    Task<List<UsageEventEntity>> QueryEventsAsync(long startTime = 0, long endTime = 0, string? model = null, CancellationToken ct = default);
+    Task<PagedResult<UsageEventEntity>> QueryEventsPagedAsync(
+        long startTime = 0, long endTime = 0, string? model = null,
+        int pageIndex = 1, int pageSize = 100, CancellationToken ct = default);
 
     /// <summary>
     /// 查询所有不同的模型名（用于筛选下拉）。
@@ -50,4 +55,14 @@ public interface IUsageRepository
     /// 清空所有历史数据（用户手动触发）。
     /// </summary>
     Task ClearAllAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// upsert 订阅/账单信息快照（按 SnapshotTime 按小时截断去重）。
+    /// </summary>
+    Task<int> UpsertSubscriptionAsync(SubscriptionEntity entity, CancellationToken ct = default);
+
+    /// <summary>
+    /// 获取最近一条订阅信息。
+    /// </summary>
+    Task<SubscriptionEntity?> GetLatestSubscriptionAsync(CancellationToken ct = default);
 }

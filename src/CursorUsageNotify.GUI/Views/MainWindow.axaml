@@ -74,6 +74,24 @@
                     </StackPanel>
                 </StackPanel>
 
+                <!-- 第三行：订阅信息 -->
+                <StackPanel Orientation="Horizontal" Spacing="24">
+                    <StackPanel Orientation="Vertical" Spacing="4" MinWidth="180">
+                        <TextBlock Text="订阅起始" FontSize="12" Foreground="#FF9CA3AF"/>
+                        <TextBlock Text="{Binding SubStartDate}" FontSize="14" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Vertical" Spacing="4" MinWidth="140">
+                        <TextBlock Text="订阅状态" FontSize="12" Foreground="#FF9CA3AF"/>
+                        <TextBlock Text="{Binding SubStatus}" FontSize="14" FontWeight="SemiBold" Foreground="#FFD1D5DB"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Vertical" Spacing="4" MinWidth="100">
+                        <TextBlock Text="发票数" FontSize="12" Foreground="#FF9CA3AF"/>
+                        <TextBlock Text="{Binding InvoiceCount}" FontSize="14" FontWeight="SemiBold" Foreground="#FFD1D5DB"/>
+                    </StackPanel>
+                </StackPanel>
+
             </StackPanel>
         </Border>
 

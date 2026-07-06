@@ -1,3 +1,4 @@
+using CursorUsageNotify.Core;
 using CursorUsageNotify.Models.Entities;
 using Microsoft.Extensions.Logging;
 using SqlSugar;
@@ -70,11 +71,9 @@ public sealed class UsageRepository : IUsageRepository
     }
 
     /// <inheritdoc/>
-    public async Task<List<UsageEventEntity>> QueryEventsAsync(
-        long startTime = 0,
-        long endTime = 0,
-        string? model = null,
-        CancellationToken ct = default)
+    public async Task<PagedResult<UsageEventEntity>> QueryEventsPagedAsync(
+        long startTime = 0, long endTime = 0, string? model = null,
+        int pageIndex = 1, int pageSize = 100, CancellationToken ct = default)
     {
         var query = _db.Queryable<UsageEventEntity>();
 
@@ -91,7 +90,19 @@ public sealed class UsageRepository : IUsageRepository
             query = query.Where(e => e.Model == model);
         }
 
-        return await query.OrderBy(e => e.Timestamp, OrderByType.Desc).ToListAsync(ct);
+        var total = await query.CountAsync(ct);
+        var items = await query.OrderBy(e => e.Timestamp, OrderByType.Desc)
+                               .Skip((pageIndex - 1) * pageSize)
+                               .Take(pageSize)
+                               .ToListAsync(ct);
+
+        return new PagedResult<UsageEventEntity>
+        {
+            Items = items,
+            TotalCount = total,
+            PageIndex = pageIndex,
+            PageSize = pageSize
+        };
     }
 
     /// <inheritdoc/>
@@ -126,6 +137,30 @@ public sealed class UsageRepository : IUsageRepository
         await _db.Deleteable<UsageEventEntity>().ExecuteCommandAsync(ct);
         await _db.Deleteable<PeriodUsageEntity>().ExecuteCommandAsync(ct);
         await _db.Deleteable<UserInfoEntity>().ExecuteCommandAsync(ct);
+        await _db.Deleteable<SubscriptionEntity>().ExecuteCommandAsync(ct);
         _logger.LogWarning("用户已清空所有历史用量数据");
+    }
+
+    /// <inheritdoc/>
+    public async Task<int> UpsertSubscriptionAsync(SubscriptionEntity entity, CancellationToken ct = default)
+    {
+        // SnapshotTime 按小时截断
+        entity.SnapshotTime = (entity.SnapshotTime / 3600000) * 3600000;
+
+        var x = _db.Storageable(entity)
+            .WhereColumns(p => p.SnapshotTime)
+            .ToStorage();
+
+        var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
+        var updated = await x.AsUpdateable.ExecuteCommandAsync(ct);
+        return inserted + updated;
+    }
+
+    /// <inheritdoc/>
+    public async Task<SubscriptionEntity?> GetLatestSubscriptionAsync(CancellationToken ct = default)
+    {
+        return await _db.Queryable<SubscriptionEntity>()
+            .OrderBy(e => e.SnapshotTime, OrderByType.Desc)
+            .FirstAsync(ct);
     }
 }

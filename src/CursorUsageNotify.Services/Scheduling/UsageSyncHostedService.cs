@@ -158,11 +158,27 @@ public sealed class UsageSyncHostedService : BackgroundService
                 }, ct);
             }
 
+            // 拉取订阅/账单信息（从 /dashboard/billing 页面解析）
+            try
+            {
+                var billingData = await _apiClient.GetBillingPageDataAsync(_options.SessionToken, ct);
+                if (billingData?.Props?.PageProps is { } pageProps)
+                {
+                    var subEntity = MapToSubscriptionEntity(pageProps, nowMs);
+                    await _repository.UpsertSubscriptionAsync(subEntity, ct);
+                }
+            }
+            catch (CursorApiException ex)
+            {
+                _logger.LogWarning(ex, "拉取账单页面数据失败（不影响事件入库）");
+            }
+
             _options.LastSyncTimeMs = nowMs;
 
             var latestPeriod = await _repository.GetLatestPeriodUsageAsync(ct);
             var latestUser = await _repository.GetLatestUserInfoAsync(ct);
-            _messenger.Send(new UsageDataFetchedMessage(inserted, latestPeriod, latestUser, nowMs));
+            var latestSub = await _repository.GetLatestSubscriptionAsync(ct);
+            _messenger.Send(new UsageDataFetchedMessage(inserted, latestPeriod, latestUser, latestSub, nowMs));
 
             _logger.LogInformation("同步完成：拉取 {Total} 条事件，入库 {Inserted} 条", allEvents.Count, inserted);
         }
@@ -250,6 +266,38 @@ public sealed class UsageSyncHostedService : BackgroundService
             FastPremiumRequests = dto.FastPremiumRequests ?? 0,
             RemainingRequests = dto.RemainingRequests ?? 0,
             RawJson = JsonSerializer.Serialize(dto)
+        };
+    }
+
+    private static SubscriptionEntity MapToSubscriptionEntity(CursorBillingPagePropsData pageProps, long fetchMs)
+    {
+        var sub = pageProps.Subscription;
+        var invoices = pageProps.Invoices;
+
+        // 从最早发票推断订阅起始日期
+        var subStart = sub?.CurrentPeriodStart ?? 0;
+        if (invoices?.Count > 0)
+        {
+            var earliestInvoice = invoices
+                .Where(i => i.PeriodStart.HasValue)
+                .MinBy(i => i.PeriodStart);
+            if (earliestInvoice?.PeriodStart > 0)
+                subStart = Math.Min(subStart, earliestInvoice.PeriodStart.Value);
+        }
+
+        return new SubscriptionEntity
+        {
+            SnapshotTime = fetchMs,
+            Plan = sub?.Plan,
+            Status = sub?.Status,
+            CurrentPeriodStart = sub?.CurrentPeriodStart ?? 0,
+            CurrentPeriodEnd = sub?.CurrentPeriodEnd ?? 0,
+            TrialEnd = sub?.TrialEnd ?? 0,
+            CancelAtPeriodEnd = sub?.CancelAtPeriodEnd ?? false,
+            SubscriptionStart = subStart,
+            InvoiceCount = invoices?.Count ?? 0,
+            Email = pageProps.Team?.Email,
+            RawJson = JsonSerializer.Serialize(pageProps)
         };
     }
 }

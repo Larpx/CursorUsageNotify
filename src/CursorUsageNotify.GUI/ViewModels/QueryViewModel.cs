@@ -12,12 +12,15 @@ using CursorUsageNotify.Services.Storage;
 namespace CursorUsageNotify.GUI.ViewModels;
 
 /// <summary>
-/// 查询 Tab：按时间/模型筛选用量事件，支持 CSV 导出。
+/// 查询 Tab：按时间/模型筛选用量事件，分页展示，支持 CSV 导出。
 /// </summary>
 public sealed partial class QueryViewModel : ViewModelBase
 {
     private readonly IUsageRepository _repository;
     private readonly ICsvExporter _csvExporter;
+
+    /// <summary>每页记录数，固定为 100。</summary>
+    private const int PageSize = 100;
 
     public QueryViewModel(IUsageRepository repository, ICsvExporter csvExporter, IMessenger messenger)
         : base(messenger)
@@ -25,8 +28,8 @@ public sealed partial class QueryViewModel : ViewModelBase
         _repository = repository;
         _csvExporter = csvExporter;
         Messenger.Register<UsageDataFetchedMessage>(this, async (_, _) => await LoadAsync());
-        _ = LoadAsync();
         _ = LoadModelsAsync();
+        _ = LoadAsync();
     }
 
     [ObservableProperty]
@@ -47,7 +50,74 @@ public sealed partial class QueryViewModel : ViewModelBase
     [ObservableProperty]
     private string _statusText = "共 0 条";
 
-    /// <summary>查询数据库。</summary>
+    // ---- 分页状态 ----
+
+    [ObservableProperty]
+    private int _pageIndex = 1;
+
+    [ObservableProperty]
+    private int _totalCount;
+
+    [ObservableProperty]
+    private int _totalPages = 1;
+
+    /// <summary>是否有上一页。</summary>
+    public bool CanGoPrev => PageIndex > 1;
+
+    /// <summary>是否有下一页。</summary>
+    public bool CanGoNext => PageIndex < TotalPages;
+
+    /// <summary>分页摘要文字。</summary>
+    public string PageSummary => TotalCount > 0
+        ? $"第 {PageIndex}/{TotalPages} 页，共 {TotalCount} 条"
+        : "共 0 条";
+
+    partial void OnPageIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(CanGoPrev));
+        OnPropertyChanged(nameof(CanGoNext));
+        OnPropertyChanged(nameof(PageSummary));
+    }
+
+    partial void OnTotalCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(PageSummary));
+    }
+
+    partial void OnTotalPagesChanged(int value)
+    {
+        OnPropertyChanged(nameof(CanGoNext));
+        OnPropertyChanged(nameof(PageSummary));
+    }
+
+    /// <summary>重置模型筛选，默认不筛选全部模型。</summary>
+    [RelayCommand]
+    private void ResetModel()
+    {
+        SelectedModel = null;
+        PageIndex = 1;
+        _ = LoadAsync();
+    }
+
+    /// <summary>上一页。</summary>
+    [RelayCommand]
+    private async Task GoPrevAsync()
+    {
+        if (!CanGoPrev) return;
+        PageIndex--;
+        await LoadAsync();
+    }
+
+    /// <summary>下一页。</summary>
+    [RelayCommand]
+    private async Task GoNextAsync()
+    {
+        if (!CanGoNext) return;
+        PageIndex++;
+        await LoadAsync();
+    }
+
+    /// <summary>分页查询数据库（当前筛选条件 + 当前页码）。</summary>
     [RelayCommand]
     private async Task LoadAsync()
     {
@@ -58,9 +128,11 @@ public sealed partial class QueryViewModel : ViewModelBase
             ? new DateTimeOffset(EndTime.Value.Date.AddDays(1), TimeZoneInfo.Local.GetUtcOffset(EndTime.Value.Date.AddDays(1))).ToUnixTimeMilliseconds()
             : 0;
 
-        var events = await _repository.QueryEventsAsync(startMs, endMs, SelectedModel);
-        Events = events;
-        StatusText = $"共 {events.Count} 条";
+        var result = await _repository.QueryEventsPagedAsync(startMs, endMs, SelectedModel, PageIndex, PageSize);
+        Events = result.Items;
+        TotalCount = result.TotalCount;
+        TotalPages = result.TotalPages;
+        StatusText = PageSummary;
     }
 
     /// <summary>加载模型下拉选项。</summary>
