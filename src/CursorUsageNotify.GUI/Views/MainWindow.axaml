@@ -9,8 +9,8 @@
         x:DataType="vm:MainViewModel"
         Icon="/Assets/app.ico"
         Title="Cursor 用量通知"
-        Width="900" Height="650"
-        MinWidth="800" MinHeight="550"
+        Width="1200" Height="650"
+        MinWidth="1000" MinHeight="550"
         WindowStartupLocation="CenterScreen">
 
     <Window.Resources>
@@ -84,26 +84,57 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- 第二行：用量统计 -->
-                <StackPanel Orientation="Horizontal" Spacing="24">
-                    <StackPanel Orientation="Vertical" Spacing="4" MinWidth="180">
-                        <TextBlock Text="已用 Token" FontSize="12" Foreground="#FF9CA3AF"/>
-                        <TextBlock Text="{Binding UsedTokens, StringFormat=\{0:N0\}}" FontSize="20" FontWeight="SemiBold" Foreground="#FF60A5FA"/>
+                <!-- 第二行：本订阅周期用量 -->
+                <StackPanel Orientation="Vertical" Spacing="2">
+                    <TextBlock Text="本周期用量" FontSize="12" FontWeight="SemiBold" Foreground="#FF9CA3AF" Margin="0,0,0,4"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <StackPanel Orientation="Vertical" Spacing="2" MinWidth="170">
+                            <TextBlock Text="输入 Token" FontSize="11" Foreground="#FF6B7280"/>
+                            <TextBlock Text="{Binding PeriodInputTokens, StringFormat=\{0:N0\}}" FontSize="18" FontWeight="SemiBold" Foreground="#FF60A5FA"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Vertical" Spacing="2" MinWidth="170">
+                            <TextBlock Text="输出 Token" FontSize="11" Foreground="#FF6B7280"/>
+                            <TextBlock Text="{Binding PeriodOutputTokens, StringFormat=\{0:N0\}}" FontSize="18" FontWeight="SemiBold" Foreground="#FF34D399"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Vertical" Spacing="2" MinWidth="170">
+                            <TextBlock Text="缓存读取" FontSize="11" Foreground="#FF6B7280"/>
+                            <TextBlock Text="{Binding PeriodCacheReadTokens, StringFormat=\{0:N0\}}" FontSize="18" FontWeight="SemiBold" Foreground="#FFFBBF24"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Vertical" Spacing="2" MinWidth="170">
+                            <TextBlock Text="缓存写入" FontSize="11" Foreground="#FF6B7280"/>
+                            <TextBlock Text="{Binding PeriodCacheWriteTokens, StringFormat=\{0:N0\}}" FontSize="18" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Vertical" Spacing="2" MinWidth="170">
+                            <TextBlock Text="费用" FontSize="11" Foreground="#FF6B7280"/>
+                            <TextBlock Text="{Binding PeriodSpendDollars, StringFormat=\${0:F2}}" FontSize="18" FontWeight="SemiBold" Foreground="#FFF87171"/>
+                        </StackPanel>
                     </StackPanel>
+                </StackPanel>
 
-                    <StackPanel Orientation="Vertical" Spacing="4" MinWidth="180">
-                        <TextBlock Text="已用请求" FontSize="12" Foreground="#FF9CA3AF"/>
-                        <TextBlock Text="{Binding UsedRequests, StringFormat=\{0:N0\}}" FontSize="20" FontWeight="SemiBold" Foreground="#FF34D399"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Vertical" Spacing="4" MinWidth="180">
-                        <TextBlock Text="剩余请求" FontSize="12" Foreground="#FF9CA3AF"/>
-                        <TextBlock Text="{Binding RemainingRequests, StringFormat=\{0:N0\}}" FontSize="20" FontWeight="SemiBold" Foreground="#FFFBBF24"/>
-                    </StackPanel>
-
-                    <StackPanel Orientation="Vertical" Spacing="4" MinWidth="180">
-                        <TextBlock Text="本周期支出" FontSize="12" Foreground="#FF9CA3AF"/>
-                        <TextBlock Text="{Binding TotalSpendDollars, StringFormat=\${0:F2}}" FontSize="20" FontWeight="SemiBold" Foreground="#FFF87171"/>
+                <!-- 第三行：本周用量 -->
+                <StackPanel Orientation="Vertical" Spacing="2">
+                    <TextBlock Text="本周用量" FontSize="12" FontWeight="SemiBold" Foreground="#FF9CA3AF" Margin="0,0,0,4"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <StackPanel Orientation="Vertical" Spacing="2" MinWidth="170">
+                            <TextBlock Text="输入 Token" FontSize="11" Foreground="#FF6B7280"/>
+                            <TextBlock Text="{Binding WeekInputTokens, StringFormat=\{0:N0\}}" FontSize="18" FontWeight="SemiBold" Foreground="#FF93C5FD"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Vertical" Spacing="2" MinWidth="170">
+                            <TextBlock Text="输出 Token" FontSize="11" Foreground="#FF6B7280"/>
+                            <TextBlock Text="{Binding WeekOutputTokens, StringFormat=\{0:N0\}}" FontSize="18" FontWeight="SemiBold" Foreground="#FF86EFAC"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Vertical" Spacing="2" MinWidth="170">
+                            <TextBlock Text="缓存读取" FontSize="11" Foreground="#FF6B7280"/>
+                            <TextBlock Text="{Binding WeekCacheReadTokens, StringFormat=\{0:N0\}}" FontSize="18" FontWeight="SemiBold" Foreground="#FFFDE047"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Vertical" Spacing="2" MinWidth="170">
+                            <TextBlock Text="缓存写入" FontSize="11" Foreground="#FF6B7280"/>
+                            <TextBlock Text="{Binding WeekCacheWriteTokens, StringFormat=\{0:N0\}}" FontSize="18" FontWeight="SemiBold" Foreground="#FFC4B5FD"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Vertical" Spacing="2" MinWidth="170">
+                            <TextBlock Text="费用" FontSize="11" Foreground="#FF6B7280"/>
+                            <TextBlock Text="{Binding WeekSpendDollars, StringFormat=\${0:F2}}" FontSize="18" FontWeight="SemiBold" Foreground="#FFFCA5A5"/>
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
 

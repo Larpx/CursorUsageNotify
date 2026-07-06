@@ -242,7 +242,9 @@ public sealed class UsageSyncHostedService : BackgroundService
                 ? await _repository.AggregateStatsAsync(aggPeriodStart, aggPeriodEnd, ct)
                 : null;
 
-            _messenger.Send(new UsageDataFetchedMessage(inserted, latestPeriod, latestUser, latestSub, aggStats, nowMs));
+            var weeklyStats = await _repository.AggregateWeeklyStatsAsync(ct);
+
+            _messenger.Send(new UsageDataFetchedMessage(inserted, latestPeriod, latestUser, latestSub, aggStats, weeklyStats, nowMs));
 
             _logger.LogInformation("同步完成：拉取 {Total} 条事件，入库 {Inserted} 条", allEvents.Count, inserted);
         }

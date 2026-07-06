@@ -182,6 +182,10 @@ public sealed class UsageRepository : IUsageRepository
             TotalTokens = events.Sum(e => e.InputTokens + e.OutputTokens),
             TotalRequests = events.Count,
             TotalSpendCents = events.Sum(e => e.ChargedCents),
+            TotalInputTokens = events.Sum(e => e.InputTokens),
+            TotalOutputTokens = events.Sum(e => e.OutputTokens),
+            TotalCacheReadTokens = events.Sum(e => e.CacheReadTokens),
+            TotalCacheWriteTokens = events.Sum(e => e.CacheWriteTokens),
             TokenBasedRequests = events.Count(e => e.IsTokenBasedCall),
             CostBasedRequests = events.Count(e => !e.IsTokenBasedCall),
             PeriodStart = periodStart,
@@ -197,5 +201,17 @@ public sealed class UsageRepository : IUsageRepository
             .OrderBy(e => e.Timestamp, OrderByType.Asc)
             .FirstAsync(ct);
         return first?.UserEmail;
+    }
+
+    /// <inheritdoc/>
+    public async Task<UsageAggregateStats> AggregateWeeklyStatsAsync(CancellationToken ct = default)
+    {
+        var now = DateTime.Now;
+        var daysSinceMonday = now.DayOfWeek == DayOfWeek.Sunday ? 6 : (int)now.DayOfWeek - (int)DayOfWeek.Monday;
+        var monday = now.Date.AddDays(-daysSinceMonday);
+        var weekStart = new DateTimeOffset(monday, TimeSpan.Zero).ToUnixTimeMilliseconds();
+        var weekEnd = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        return await AggregateStatsAsync(weekStart, weekEnd, ct);
     }
 }

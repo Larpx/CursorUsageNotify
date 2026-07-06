@@ -76,6 +76,11 @@ public interface IUsageRepository
     Task<UsageAggregateStats> AggregateStatsAsync(long periodStart, long periodEnd, CancellationToken ct = default);
 
     /// <summary>
+    /// 聚合本周（周一 00:00 至今）的用量统计数据。
+    /// </summary>
+    Task<UsageAggregateStats> AggregateWeeklyStatsAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// 获取范围内第一条事件的用户邮箱（用于推断账号信息）。
     /// </summary>
     Task<string?> GetFirstUserEmailAsync(CancellationToken ct = default);

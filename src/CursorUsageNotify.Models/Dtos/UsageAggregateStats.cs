@@ -14,6 +14,18 @@ public sealed class UsageAggregateStats
     /// <summary>总支出（美分）。</summary>
     public decimal TotalSpendCents { get; set; }
 
+    /// <summary>输入 token 总数。</summary>
+    public long TotalInputTokens { get; set; }
+
+    /// <summary>输出 token 总数。</summary>
+    public long TotalOutputTokens { get; set; }
+
+    /// <summary>缓存读取 token 总数。</summary>
+    public long TotalCacheReadTokens { get; set; }
+
+    /// <summary>缓存写入 token 总数。</summary>
+    public long TotalCacheWriteTokens { get; set; }
+
     /// <summary>按 token 计费的请求数。</summary>
     public int TokenBasedRequests { get; set; }
 

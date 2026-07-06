@@ -42,17 +42,49 @@ public sealed partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private string _periodRange = "-";
 
-    [ObservableProperty]
-    private long _usedTokens;
+    // ---- 本订阅周期用量统计 ----
 
+    /// <summary>本订阅周期输入 token 总数。</summary>
     [ObservableProperty]
-    private long _usedRequests;
+    private long _periodInputTokens;
 
+    /// <summary>本订阅周期输出 token 总数。</summary>
     [ObservableProperty]
-    private decimal _totalSpendDollars;
+    private long _periodOutputTokens;
 
+    /// <summary>本订阅周期缓存读取 token 总数。</summary>
     [ObservableProperty]
-    private long _remainingRequests;
+    private long _periodCacheReadTokens;
+
+    /// <summary>本订阅周期缓存写入 token 总数。</summary>
+    [ObservableProperty]
+    private long _periodCacheWriteTokens;
+
+    /// <summary>本订阅周期总支出（美元）。</summary>
+    [ObservableProperty]
+    private decimal _periodSpendDollars;
+
+    // ---- 本周用量统计 ----
+
+    /// <summary>本周输入 token 总数。</summary>
+    [ObservableProperty]
+    private long _weekInputTokens;
+
+    /// <summary>本周输出 token 总数。</summary>
+    [ObservableProperty]
+    private long _weekOutputTokens;
+
+    /// <summary>本周缓存读取 token 总数。</summary>
+    [ObservableProperty]
+    private long _weekCacheReadTokens;
+
+    /// <summary>本周缓存写入 token 总数。</summary>
+    [ObservableProperty]
+    private long _weekCacheWriteTokens;
+
+    /// <summary>本周总支出（美元）。</summary>
+    [ObservableProperty]
+    private decimal _weekSpendDollars;
 
     [ObservableProperty]
     private string _lastFetchTime = "-";
@@ -193,21 +225,30 @@ public sealed partial class MainViewModel : ViewModelBase
         }
 
         // 用量统计：优先 events 表聚合数据，其次 API 快照
-        if (agg is not null && (agg.TotalTokens > 0 || agg.TotalRequests > 0))
+        if (agg is not null)
         {
-            UsedTokens = agg.TotalTokens;
-            UsedRequests = agg.TotalRequests;
-            TotalSpendDollars = agg.TotalSpendCents / 100m;
+            PeriodInputTokens = agg.TotalInputTokens;
+            PeriodOutputTokens = agg.TotalOutputTokens;
+            PeriodCacheReadTokens = agg.TotalCacheReadTokens;
+            PeriodCacheWriteTokens = agg.TotalCacheWriteTokens;
+            PeriodSpendDollars = agg.TotalSpendCents / 100m;
         }
         else if (period is not null)
         {
-            UsedTokens = period.UsedTokens;
-            UsedRequests = period.UsedRequests;
-            TotalSpendDollars = period.TotalSpendCents / 100m;
+            PeriodInputTokens = period.UsedTokens;
+            PeriodSpendDollars = period.TotalSpendCents / 100m;
         }
 
-        // 剩余请求：仅来自 API 快照
-        RemainingRequests = period?.RemainingRequests ?? 0;
+        // 本周统计
+        var weekly = msg?.WeeklyAggregateStats;
+        if (weekly is not null)
+        {
+            WeekInputTokens = weekly.TotalInputTokens;
+            WeekOutputTokens = weekly.TotalOutputTokens;
+            WeekCacheReadTokens = weekly.TotalCacheReadTokens;
+            WeekCacheWriteTokens = weekly.TotalCacheWriteTokens;
+            WeekSpendDollars = weekly.TotalSpendCents / 100m;
+        }
 
         // 订阅信息（从 billing 页面获取）
         if (sub is not null)

@@ -11,6 +11,7 @@ namespace CursorUsageNotify.Services.Messages;
 /// <param name="LatestUser">最新的用户信息。</param>
 /// <param name="LatestSubscription">最新的订阅信息（含起始日期等）。</param>
 /// <param name="AggregateStats">从 usage_events 表按订阅周期聚合的统计数据。</param>
+/// <param name="WeeklyAggregateStats">本周（周一 00:00 至今）聚合的统计数据。</param>
 /// <param name="FetchTimestampMs">拉取时间戳（epoch 毫秒）。</param>
 public sealed record UsageDataFetchedMessage(
     int NewEventsCount,
@@ -18,6 +19,7 @@ public sealed record UsageDataFetchedMessage(
     UserInfoEntity? LatestUser,
     SubscriptionEntity? LatestSubscription,
     UsageAggregateStats? AggregateStats,
+    UsageAggregateStats? WeeklyAggregateStats,
     long FetchTimestampMs);
 
 /// <summary>
