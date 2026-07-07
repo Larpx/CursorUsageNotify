@@ -19,8 +19,8 @@ public sealed partial class QueryViewModel : ViewModelBase
     private readonly IUsageRepository _repository;
     private readonly ICsvExporter _csvExporter;
 
-    /// <summary>每页记录数，固定为 100。</summary>
-    private const int PageSize = 100;
+    /// <summary>每页行数可选项。</summary>
+    public static readonly int[] PageSizeOptions = { 10, 20, 50, 100 };
 
     public QueryViewModel(IUsageRepository repository, ICsvExporter csvExporter, IMessenger messenger)
         : base(messenger)
@@ -29,6 +29,20 @@ public sealed partial class QueryViewModel : ViewModelBase
         _csvExporter = csvExporter;
         Messenger.Register<UsageDataFetchedMessage>(this, async (_, _) => await LoadAsync());
         _ = LoadModelsAsync();
+        _ = LoadAsync();
+    }
+
+    /// <summary>每页记录数，默认 10。</summary>
+    [ObservableProperty]
+    private int _pageSize = 10;
+
+    /// <summary>每页行数选项列表（供 ComboBox 绑定）。</summary>
+    public List<int> PageSizeOptionList { get; } = new(PageSizeOptions);
+
+    /// <summary>切换每页行数时重置到第一页并重新加载。</summary>
+    partial void OnPageSizeChanged(int value)
+    {
+        PageIndex = 1;
         _ = LoadAsync();
     }
 

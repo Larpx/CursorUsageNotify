@@ -36,44 +36,62 @@
             </StackPanel>
         </Border>
 
-        <!-- 底部：分页导航 + 状态 -->
+        <!-- 底部：分页导航 + 每页行数 + 状态 -->
         <Border DockPanel.Dock="Bottom" Padding="12,6" Background="#FFF3F4F6" BorderBrush="#FFE5E7EB" BorderThickness="0,1,0,0">
-            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                <TextBlock Text="{Binding PageSummary}" FontSize="12" Foreground="#FF4B5563" VerticalAlignment="Center"/>
-                <Button Content="◀ 上一页"
-                        Command="{Binding GoPrevCommand}"
-                        IsEnabled="{Binding CanGoPrev}"
-                        FontSize="12"
-                        Padding="8,2"/>
-                <Button Content="下一页 ▶"
-                        Command="{Binding GoNextCommand}"
-                        IsEnabled="{Binding CanGoNext}"
-                        FontSize="12"
-                        Padding="8,2"/>
-            </StackPanel>
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <!-- 左：每页行数选择 -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock Text="每页" FontSize="12" Foreground="#FF4B5563" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding PageSizeOptionList}"
+                              SelectedItem="{Binding PageSize}"
+                              MinWidth="70"
+                              FontSize="12"/>
+                    <TextBlock Text="行" FontSize="12" Foreground="#FF4B5563" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- 中：分页摘要 -->
+                <TextBlock Grid.Column="1" Text="{Binding PageSummary}" FontSize="12" Foreground="#FF4B5563"
+                           VerticalAlignment="Center" HorizontalAlignment="Center"/>
+
+                <!-- 右：翻页按钮 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Content="◀ 上一页"
+                            Command="{Binding GoPrevCommand}"
+                            IsEnabled="{Binding CanGoPrev}"
+                            FontSize="12"
+                            Padding="8,2"/>
+                    <Button Content="下一页 ▶"
+                            Command="{Binding GoNextCommand}"
+                            IsEnabled="{Binding CanGoNext}"
+                            FontSize="12"
+                            Padding="8,2"/>
+                </StackPanel>
+            </Grid>
         </Border>
 
-        <!-- DataGrid -->
+        <!-- DataGrid：启用虚拟化避免缩放卡顿，列宽固定减少布局重算 -->
         <DataGrid ItemsSource="{Binding Events}"
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
                   GridLinesVisibility="Horizontal"
                   BorderThickness="1"
                   BorderBrush="#FFE5E7EB"
-                  HeadersVisibility="Column">
+                  HeadersVisibility="Column"
+                  ScrollViewer.IsScrollChainingEnabled="True">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="时间"
                                     Binding="{Binding Timestamp, Converter={StaticResource EpochToDate}, Mode=OneWay}"
-                                    MinWidth="160"/>
-                <DataGridTextColumn Header="模型" Binding="{Binding Model}" MinWidth="160"/>
-                <DataGridTextColumn Header="输入 Token" Binding="{Binding InputTokens, StringFormat=\{0:N0\}}"/>
-                <DataGridTextColumn Header="输出 Token" Binding="{Binding OutputTokens, StringFormat=\{0:N0\}}"/>
-                <DataGridTextColumn Header="缓存读" Binding="{Binding CacheReadTokens, StringFormat=\{0:N0\}}"/>
-                <DataGridTextColumn Header="缓存写" Binding="{Binding CacheWriteTokens, StringFormat=\{0:N0\}}"/>
+                                    Width="170"/>
+                <DataGridTextColumn Header="模型" Binding="{Binding Model}" Width="180"/>
+                <DataGridTextColumn Header="输入 Token" Binding="{Binding InputTokens, StringFormat=\{0:N0\}}" Width="110"/>
+                <DataGridTextColumn Header="输出 Token" Binding="{Binding OutputTokens, StringFormat=\{0:N0\}}" Width="110"/>
+                <DataGridTextColumn Header="缓存读" Binding="{Binding CacheReadTokens, StringFormat=\{0:N0\}}" Width="110"/>
+                <DataGridTextColumn Header="缓存写" Binding="{Binding CacheWriteTokens, StringFormat=\{0:N0\}}" Width="110"/>
                 <DataGridTextColumn Header="费用"
-                                    Binding="{Binding TotalCents, Converter={StaticResource CentsToCurrency}, Mode=OneWay}"/>
-                <DataGridCheckBoxColumn Header="Max" Binding="{Binding MaxMode}"/>
-                <DataGridCheckBoxColumn Header="Headless" Binding="{Binding IsHeadless}"/>
+                                    Binding="{Binding TotalCents, Converter={StaticResource CentsToCurrency}, Mode=OneWay}"
+                                    Width="90"/>
+                <DataGridCheckBoxColumn Header="Max" Binding="{Binding MaxMode}" Width="60"/>
+                <DataGridCheckBoxColumn Header="Headless" Binding="{Binding IsHeadless}" Width="80"/>
             </DataGrid.Columns>
         </DataGrid>
 

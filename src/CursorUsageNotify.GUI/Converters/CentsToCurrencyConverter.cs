@@ -17,17 +17,17 @@ public sealed class CentsToCurrencyConverter : IValueConverter
     {
         if (value is decimal cents)
         {
-            return (cents / 100m).ToString("C2", CultureInfo.InvariantCulture);
+            return (cents / 100m).ToString("$0.00", CultureInfo.InvariantCulture);
         }
 
         if (value is long centsLong)
         {
-            return (centsLong / 100m).ToString("C2", CultureInfo.InvariantCulture);
+            return (centsLong / 100m).ToString("$0.00", CultureInfo.InvariantCulture);
         }
 
         if (value is int centsInt)
         {
-            return (centsInt / 100m).ToString("C2", CultureInfo.InvariantCulture);
+            return (centsInt / 100m).ToString("$0.00", CultureInfo.InvariantCulture);
         }
 
         return "-";

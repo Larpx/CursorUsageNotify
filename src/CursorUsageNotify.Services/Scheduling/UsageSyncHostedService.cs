@@ -247,6 +247,9 @@ public sealed class UsageSyncHostedService : BackgroundService
             _messenger.Send(new UsageDataFetchedMessage(inserted, latestPeriod, latestUser, latestSub, aggStats, weeklyStats, nowMs));
 
             _logger.LogInformation("同步完成：拉取 {Total} 条事件，入库 {Inserted} 条", allEvents.Count, inserted);
+
+            // 每次同步成功都推送通知（含启动首次拉取）
+            await NotifySyncSuccessAsync(inserted, aggStats, weeklyStats, ct);
         }
         catch (CursorApiAuthException ex)
         {
@@ -262,6 +265,39 @@ public sealed class UsageSyncHostedService : BackgroundService
         {
             _logger.LogError(ex, "同步过程发生未预期异常");
             _messenger.Send(new SyncFailedMessage($"未预期错误：{ex.Message}"));
+        }
+    }
+
+    /// <summary>
+    /// 同步成功后推送通知，包含本次新增事件数和本周期/本周用量摘要。
+    /// </summary>
+    private async Task NotifySyncSuccessAsync(
+        int newEventsCount,
+        UsageAggregateStats? periodStats,
+        UsageAggregateStats? weeklyStats,
+        CancellationToken ct)
+    {
+        try
+        {
+            var periodSpend = periodStats?.TotalSpendCents / 100m ?? 0m;
+            var weekSpend = weeklyStats?.TotalSpendCents / 100m ?? 0m;
+            var periodTokens = periodStats?.TotalTokens ?? 0;
+            var weekTokens = weeklyStats?.TotalTokens ?? 0;
+
+            var title = "Cursor 用量更新";
+            var body = $"新增 {newEventsCount} 条事件\n"
+                       + $"本周期：{periodTokens:N0} tokens，${periodSpend:F2}\n"
+                       + $"本周：{weekTokens:N0} tokens，${weekSpend:F2}";
+
+            await _notification.ShowAsync(title, body, ct);
+
+            var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            _options.LastNotificationTimeMs = nowMs;
+            _messenger.Send(new NotificationShownMessage(nowMs));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "同步成功通知发送失败");
         }
     }
 

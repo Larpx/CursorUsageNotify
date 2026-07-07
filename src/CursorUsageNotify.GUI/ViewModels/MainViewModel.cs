@@ -64,6 +64,10 @@ public sealed partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private decimal _periodSpendDollars;
 
+    /// <summary>本订阅周期总 token 用量（输入+输出+缓存读+缓存写）。</summary>
+    [ObservableProperty]
+    private long _periodTotalTokens;
+
     // ---- 本周用量统计 ----
 
     /// <summary>本周输入 token 总数。</summary>
@@ -85,6 +89,10 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>本周总支出（美元）。</summary>
     [ObservableProperty]
     private decimal _weekSpendDollars;
+
+    /// <summary>本周总 token 用量（输入+输出+缓存读+缓存写）。</summary>
+    [ObservableProperty]
+    private long _weekTotalTokens;
 
     [ObservableProperty]
     private string _lastFetchTime = "-";
@@ -232,11 +240,14 @@ public sealed partial class MainViewModel : ViewModelBase
             PeriodCacheReadTokens = agg.TotalCacheReadTokens;
             PeriodCacheWriteTokens = agg.TotalCacheWriteTokens;
             PeriodSpendDollars = agg.TotalSpendCents / 100m;
+            PeriodTotalTokens = agg.TotalInputTokens + agg.TotalOutputTokens
+                                + agg.TotalCacheReadTokens + agg.TotalCacheWriteTokens;
         }
         else if (period is not null)
         {
             PeriodInputTokens = period.UsedTokens;
             PeriodSpendDollars = period.TotalSpendCents / 100m;
+            PeriodTotalTokens = period.UsedTokens;
         }
 
         // 本周统计
@@ -248,6 +259,8 @@ public sealed partial class MainViewModel : ViewModelBase
             WeekCacheReadTokens = weekly.TotalCacheReadTokens;
             WeekCacheWriteTokens = weekly.TotalCacheWriteTokens;
             WeekSpendDollars = weekly.TotalSpendCents / 100m;
+            WeekTotalTokens = weekly.TotalInputTokens + weekly.TotalOutputTokens
+                              + weekly.TotalCacheReadTokens + weekly.TotalCacheWriteTokens;
         }
 
         // 订阅信息（从 billing 页面获取）
@@ -262,8 +275,8 @@ public sealed partial class MainViewModel : ViewModelBase
             {
                 var subEnd = DateTimeOffset.FromUnixTimeMilliseconds(sub.CurrentPeriodEnd).LocalDateTime;
                 SubEndDate = sub.CancelAtPeriodEnd
-                    ? $"{subEnd:yyyy-MM-dd}（到期取消）"
-                    : $"{subEnd:yyyy-MM-dd}（自动续费）";
+                    ? $"{subEnd:yyyy-MM-dd}[到期取消]"
+                    : $"{subEnd:yyyy-MM-dd}[自动续费]";
             }
             SubStatus = sub.Status switch
             {

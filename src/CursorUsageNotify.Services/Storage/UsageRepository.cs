@@ -209,7 +209,8 @@ public sealed class UsageRepository : IUsageRepository
         var now = DateTime.Now;
         var daysSinceMonday = now.DayOfWeek == DayOfWeek.Sunday ? 6 : (int)now.DayOfWeek - (int)DayOfWeek.Monday;
         var monday = now.Date.AddDays(-daysSinceMonday);
-        var weekStart = new DateTimeOffset(monday, TimeSpan.Zero).ToUnixTimeMilliseconds();
+        // monday.Kind == Local，需用本地 offset 构造，否则 DateTimeOffset 抛 ArgumentException
+        var weekStart = new DateTimeOffset(monday, TimeZoneInfo.Local.GetUtcOffset(monday)).ToUnixTimeMilliseconds();
         var weekEnd = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
         return await AggregateStatsAsync(weekStart, weekEnd, ct);
