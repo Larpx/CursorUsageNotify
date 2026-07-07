@@ -360,3 +360,8 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# CodeGraph - auto-generated code graph
+.codegraph/
+# Trae - auto-generated code graph
+.trae/
