@@ -1,218 +1,223 @@
-using CursorUsageNotify.Core;
-using CursorUsageNotify.Models.Dtos;
-using CursorUsageNotify.Models.Entities;
+﻿using Larpx.PersonalTools.CursorUsageNotify.Core;
+using Larpx.PersonalTools.CursorUsageNotify.Models.Dtos;
+using Larpx.PersonalTools.CursorUsageNotify.Models.Entities;
 using Microsoft.Extensions.Logging;
 using SqlSugar;
 
-namespace CursorUsageNotify.Services.Storage;
 
-/// <summary>
-/// 用量数据仓储实现，基于 SqlSugar Storageable 实现 upsert 去重。
-/// </summary>
-public sealed class UsageRepository : IUsageRepository
+namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
 {
-    private readonly ISqlSugarClient _db;
-    private readonly ILogger<UsageRepository> _logger;
-
-    public UsageRepository(IDbContext context, ILogger<UsageRepository> logger)
+    /// <summary>
+    /// 用量数据仓储实现，基于 SqlSugar Storageable 实现 upsert 去重。
+    /// </summary>
+    public sealed class UsageRepository : IUsageRepository
     {
-        _db = context.Client;
-        _logger = logger;
-    }
+        private readonly ISqlSugarClient _db;
+        private readonly ILogger<UsageRepository> _logger;
 
-    /// <inheritdoc/>
-    public async Task<int> UpsertUsageEventsAsync(IEnumerable<UsageEventEntity> events, CancellationToken ct = default)
-    {
-        var list = events.ToList();
-        if (list.Count == 0)
+        /// <summary>
+        /// 初始化 <see cref="UsageRepository"/> 实例。
+        /// </summary>
+        public UsageRepository(IDbContext context, ILogger<UsageRepository> logger)
         {
-            return 0;
+            _db = context.Client;
+            _logger = logger;
         }
 
-        var x = _db.Storageable(list)
-            .WhereColumns(p => new { p.Timestamp, p.UserEmail })
-            .ToStorage();
-
-        var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
-        var updated = await x.AsUpdateable.ExecuteCommandAsync(ct);
-
-        _logger.LogInformation("用量事件 upsert：插入 {Inserted}，更新 {Updated}", inserted, updated);
-        return inserted + updated;
-    }
-
-    /// <inheritdoc/>
-    public async Task<int> UpsertPeriodUsageAsync(PeriodUsageEntity entity, CancellationToken ct = default)
-    {
-        // FetchTime 按秒截断，避免同一秒内重复入库
-        entity.FetchTime = (entity.FetchTime / 1000) * 1000;
-
-        var x = _db.Storageable(entity)
-            .WhereColumns(p => p.FetchTime)
-            .ToStorage();
-
-        var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
-        var updated = await x.AsUpdateable.ExecuteCommandAsync(ct);
-        _logger.LogInformation("计费周期汇总 upsert：插入 {Inserted}，更新 {Updated}", inserted, updated);
-        return inserted + updated;
-    }
-
-    /// <inheritdoc/>
-    public async Task<int> UpsertUserInfoAsync(UserInfoEntity entity, CancellationToken ct = default)
-    {
-        // SnapshotTime 按分钟截断
-        entity.SnapshotTime = (entity.SnapshotTime / 60000) * 60000;
-
-        var x = _db.Storageable(entity)
-            .WhereColumns(p => new { p.Email, p.SnapshotTime })
-            .ToStorage();
-
-        var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
-        var updated = await x.AsUpdateable.ExecuteCommandAsync(ct);
-        return inserted + updated;
-    }
-
-    /// <inheritdoc/>
-    public async Task<PagedResult<UsageEventEntity>> QueryEventsPagedAsync(
-        long startTime = 0, long endTime = 0, string? model = null,
-        int pageIndex = 1, int pageSize = 100, CancellationToken ct = default)
-    {
-        var query = _db.Queryable<UsageEventEntity>();
-
-        if (startTime > 0)
+        /// <inheritdoc/>
+        public async Task<int> UpsertUsageEventsAsync(IEnumerable<UsageEventEntity> events, CancellationToken ct = default)
         {
-            query = query.Where(e => e.Timestamp >= startTime);
-        }
-        if (endTime > 0)
-        {
-            query = query.Where(e => e.Timestamp <= endTime);
-        }
-        if (!string.IsNullOrEmpty(model))
-        {
-            query = query.Where(e => e.Model == model);
+            var list = events.ToList();
+            if (list.Count == 0)
+            {
+                return 0;
+            }
+
+            var x = _db.Storageable(list)
+                .WhereColumns(p => new { p.Timestamp, p.UserEmail })
+                .ToStorage();
+
+            var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
+            var updated = await x.AsUpdateable.ExecuteCommandAsync(ct);
+
+            _logger.LogInformation("用量事件 upsert：插入 {Inserted}，更新 {Updated}", inserted, updated);
+            return inserted + updated;
         }
 
-        var total = await query.CountAsync(ct);
-        var items = await query.OrderBy(e => e.Timestamp, OrderByType.Desc)
-                               .Skip((pageIndex - 1) * pageSize)
-                               .Take(pageSize)
-                               .ToListAsync(ct);
-
-        return new PagedResult<UsageEventEntity>
+        /// <inheritdoc/>
+        public async Task<int> UpsertPeriodUsageAsync(PeriodUsageEntity entity, CancellationToken ct = default)
         {
-            Items = items,
-            TotalCount = total,
-            PageIndex = pageIndex,
-            PageSize = pageSize
-        };
-    }
+            // FetchTime 按秒截断，避免同一秒内重复入库
+            entity.FetchTime = (entity.FetchTime / 1000) * 1000;
 
-    /// <inheritdoc/>
-    public async Task<List<string>> GetDistinctModelsAsync(CancellationToken ct = default)
-    {
-        return await _db.Queryable<UsageEventEntity>()
-            .Where(e => e.Model != null && e.Model != "")
-            .Select(e => e.Model!)
-            .Distinct()
-            .ToListAsync(ct);
-    }
+            var x = _db.Storageable(entity)
+                .WhereColumns(p => p.FetchTime)
+                .ToStorage();
 
-    /// <inheritdoc/>
-    public async Task<PeriodUsageEntity?> GetLatestPeriodUsageAsync(CancellationToken ct = default)
-    {
-        return await _db.Queryable<PeriodUsageEntity>()
-            .OrderBy(e => e.FetchTime, OrderByType.Desc)
-            .FirstAsync(ct);
-    }
-
-    /// <inheritdoc/>
-    public async Task<UserInfoEntity?> GetLatestUserInfoAsync(CancellationToken ct = default)
-    {
-        return await _db.Queryable<UserInfoEntity>()
-            .OrderBy(e => e.SnapshotTime, OrderByType.Desc)
-            .FirstAsync(ct);
-    }
-
-    /// <inheritdoc/>
-    public async Task ClearAllAsync(CancellationToken ct = default)
-    {
-        await _db.Deleteable<UsageEventEntity>().ExecuteCommandAsync(ct);
-        await _db.Deleteable<PeriodUsageEntity>().ExecuteCommandAsync(ct);
-        await _db.Deleteable<UserInfoEntity>().ExecuteCommandAsync(ct);
-        await _db.Deleteable<SubscriptionEntity>().ExecuteCommandAsync(ct);
-        _logger.LogWarning("用户已清空所有历史用量数据");
-    }
-
-    /// <inheritdoc/>
-    public async Task<int> UpsertSubscriptionAsync(SubscriptionEntity entity, CancellationToken ct = default)
-    {
-        // SnapshotTime 按小时截断
-        entity.SnapshotTime = (entity.SnapshotTime / 3600000) * 3600000;
-
-        var x = _db.Storageable(entity)
-            .WhereColumns(p => p.SnapshotTime)
-            .ToStorage();
-
-        var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
-        var updated = await x.AsUpdateable.ExecuteCommandAsync(ct);
-        return inserted + updated;
-    }
-
-    /// <inheritdoc/>
-    public async Task<SubscriptionEntity?> GetLatestSubscriptionAsync(CancellationToken ct = default)
-    {
-        return await _db.Queryable<SubscriptionEntity>()
-            .OrderBy(e => e.SnapshotTime, OrderByType.Desc)
-            .FirstAsync(ct);
-    }
-
-    /// <inheritdoc/>
-    public async Task<UsageAggregateStats> AggregateStatsAsync(long periodStart, long periodEnd, CancellationToken ct = default)
-    {
-        if (periodStart <= 0 || periodEnd <= 0 || periodStart >= periodEnd)
-        {
-            return new UsageAggregateStats { PeriodStart = periodStart, PeriodEnd = periodEnd };
+            var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
+            var updated = await x.AsUpdateable.ExecuteCommandAsync(ct);
+            _logger.LogInformation("计费周期汇总 upsert：插入 {Inserted}，更新 {Updated}", inserted, updated);
+            return inserted + updated;
         }
 
-        var events = await _db.Queryable<UsageEventEntity>()
-            .Where(e => e.Timestamp >= periodStart && e.Timestamp <= periodEnd)
-            .ToListAsync(ct);
-
-        return new UsageAggregateStats
+        /// <inheritdoc/>
+        public async Task<int> UpsertUserInfoAsync(UserInfoEntity entity, CancellationToken ct = default)
         {
-            TotalTokens = events.Sum(e => e.InputTokens + e.OutputTokens),
-            TotalRequests = events.Count,
-            TotalSpendCents = events.Sum(e => e.ChargedCents),
-            TotalInputTokens = events.Sum(e => e.InputTokens),
-            TotalOutputTokens = events.Sum(e => e.OutputTokens),
-            TotalCacheReadTokens = events.Sum(e => e.CacheReadTokens),
-            TotalCacheWriteTokens = events.Sum(e => e.CacheWriteTokens),
-            TokenBasedRequests = events.Count(e => e.IsTokenBasedCall),
-            CostBasedRequests = events.Count(e => !e.IsTokenBasedCall),
-            PeriodStart = periodStart,
-            PeriodEnd = periodEnd,
-            UserEmail = events.FirstOrDefault(e => !string.IsNullOrEmpty(e.UserEmail))?.UserEmail
-        };
-    }
+            // SnapshotTime 按分钟截断
+            entity.SnapshotTime = (entity.SnapshotTime / 60000) * 60000;
 
-    /// <inheritdoc/>
-    public async Task<string?> GetFirstUserEmailAsync(CancellationToken ct = default)
-    {
-        var first = await _db.Queryable<UsageEventEntity>()
-            .OrderBy(e => e.Timestamp, OrderByType.Asc)
-            .FirstAsync(ct);
-        return first?.UserEmail;
-    }
+            var x = _db.Storageable(entity)
+                .WhereColumns(p => new { p.Email, p.SnapshotTime })
+                .ToStorage();
 
-    /// <inheritdoc/>
-    public async Task<UsageAggregateStats> AggregateWeeklyStatsAsync(CancellationToken ct = default)
-    {
-        var now = DateTime.Now;
-        var daysSinceMonday = now.DayOfWeek == DayOfWeek.Sunday ? 6 : (int)now.DayOfWeek - (int)DayOfWeek.Monday;
-        var monday = now.Date.AddDays(-daysSinceMonday);
-        // monday.Kind == Local，需用本地 offset 构造，否则 DateTimeOffset 抛 ArgumentException
-        var weekStart = new DateTimeOffset(monday, TimeZoneInfo.Local.GetUtcOffset(monday)).ToUnixTimeMilliseconds();
-        var weekEnd = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
+            var updated = await x.AsUpdateable.ExecuteCommandAsync(ct);
+            return inserted + updated;
+        }
 
-        return await AggregateStatsAsync(weekStart, weekEnd, ct);
+        /// <inheritdoc/>
+        public async Task<PagedResult<UsageEventEntity>> QueryEventsPagedAsync(
+            long startTime = 0, long endTime = 0, string? model = null,
+            int pageIndex = 1, int pageSize = 100, CancellationToken ct = default)
+        {
+            var query = _db.Queryable<UsageEventEntity>();
+
+            if (startTime > 0)
+            {
+                query = query.Where(e => e.Timestamp >= startTime);
+            }
+            if (endTime > 0)
+            {
+                query = query.Where(e => e.Timestamp <= endTime);
+            }
+            if (!string.IsNullOrEmpty(model))
+            {
+                query = query.Where(e => e.Model == model);
+            }
+
+            var total = await query.CountAsync(ct);
+            var items = await query.OrderBy(e => e.Timestamp, OrderByType.Desc)
+                                   .Skip((pageIndex - 1) * pageSize)
+                                   .Take(pageSize)
+                                   .ToListAsync(ct);
+
+            return new PagedResult<UsageEventEntity>
+            {
+                Items = items,
+                TotalCount = total,
+                PageIndex = pageIndex,
+                PageSize = pageSize
+            };
+        }
+
+        /// <inheritdoc/>
+        public async Task<List<string>> GetDistinctModelsAsync(CancellationToken ct = default)
+        {
+            return await _db.Queryable<UsageEventEntity>()
+                .Where(e => e.Model != null && e.Model != "")
+                .Select(e => e.Model!)
+                .Distinct()
+                .ToListAsync(ct);
+        }
+
+        /// <inheritdoc/>
+        public async Task<PeriodUsageEntity?> GetLatestPeriodUsageAsync(CancellationToken ct = default)
+        {
+            return await _db.Queryable<PeriodUsageEntity>()
+                .OrderBy(e => e.FetchTime, OrderByType.Desc)
+                .FirstAsync(ct);
+        }
+
+        /// <inheritdoc/>
+        public async Task<UserInfoEntity?> GetLatestUserInfoAsync(CancellationToken ct = default)
+        {
+            return await _db.Queryable<UserInfoEntity>()
+                .OrderBy(e => e.SnapshotTime, OrderByType.Desc)
+                .FirstAsync(ct);
+        }
+
+        /// <inheritdoc/>
+        public async Task ClearAllAsync(CancellationToken ct = default)
+        {
+            await _db.Deleteable<UsageEventEntity>().ExecuteCommandAsync(ct);
+            await _db.Deleteable<PeriodUsageEntity>().ExecuteCommandAsync(ct);
+            await _db.Deleteable<UserInfoEntity>().ExecuteCommandAsync(ct);
+            await _db.Deleteable<SubscriptionEntity>().ExecuteCommandAsync(ct);
+            _logger.LogWarning("用户已清空所有历史用量数据");
+        }
+
+        /// <inheritdoc/>
+        public async Task<int> UpsertSubscriptionAsync(SubscriptionEntity entity, CancellationToken ct = default)
+        {
+            // SnapshotTime 按小时截断
+            entity.SnapshotTime = (entity.SnapshotTime / 3600000) * 3600000;
+
+            var x = _db.Storageable(entity)
+                .WhereColumns(p => p.SnapshotTime)
+                .ToStorage();
+
+            var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
+            var updated = await x.AsUpdateable.ExecuteCommandAsync(ct);
+            return inserted + updated;
+        }
+
+        /// <inheritdoc/>
+        public async Task<SubscriptionEntity?> GetLatestSubscriptionAsync(CancellationToken ct = default)
+        {
+            return await _db.Queryable<SubscriptionEntity>()
+                .OrderBy(e => e.SnapshotTime, OrderByType.Desc)
+                .FirstAsync(ct);
+        }
+
+        /// <inheritdoc/>
+        public async Task<UsageAggregateStats> AggregateStatsAsync(long periodStart, long periodEnd, CancellationToken ct = default)
+        {
+            if (periodStart <= 0 || periodEnd <= 0 || periodStart >= periodEnd)
+            {
+                return new UsageAggregateStats { PeriodStart = periodStart, PeriodEnd = periodEnd };
+            }
+
+            var events = await _db.Queryable<UsageEventEntity>()
+                .Where(e => e.Timestamp >= periodStart && e.Timestamp <= periodEnd)
+                .ToListAsync(ct);
+
+            return new UsageAggregateStats
+            {
+                TotalTokens = events.Sum(e => e.InputTokens + e.OutputTokens),
+                TotalRequests = events.Count,
+                TotalSpendCents = events.Sum(e => e.ChargedCents),
+                TotalInputTokens = events.Sum(e => e.InputTokens),
+                TotalOutputTokens = events.Sum(e => e.OutputTokens),
+                TotalCacheReadTokens = events.Sum(e => e.CacheReadTokens),
+                TotalCacheWriteTokens = events.Sum(e => e.CacheWriteTokens),
+                TokenBasedRequests = events.Count(e => e.IsTokenBasedCall),
+                CostBasedRequests = events.Count(e => !e.IsTokenBasedCall),
+                PeriodStart = periodStart,
+                PeriodEnd = periodEnd,
+                UserEmail = events.FirstOrDefault(e => !string.IsNullOrEmpty(e.UserEmail))?.UserEmail
+            };
+        }
+
+        /// <inheritdoc/>
+        public async Task<string?> GetFirstUserEmailAsync(CancellationToken ct = default)
+        {
+            var first = await _db.Queryable<UsageEventEntity>()
+                .OrderBy(e => e.Timestamp, OrderByType.Asc)
+                .FirstAsync(ct);
+            return first?.UserEmail;
+        }
+
+        /// <inheritdoc/>
+        public async Task<UsageAggregateStats> AggregateWeeklyStatsAsync(CancellationToken ct = default)
+        {
+            var now = DateTime.Now;
+            var daysSinceMonday = now.DayOfWeek == DayOfWeek.Sunday ? 6 : (int)now.DayOfWeek - (int)DayOfWeek.Monday;
+            var monday = now.Date.AddDays(-daysSinceMonday);
+            // monday.Kind == Local，需用本地 offset 构造，否则 DateTimeOffset 抛 ArgumentException
+            var weekStart = new DateTimeOffset(monday, TimeZoneInfo.Local.GetUtcOffset(monday)).ToUnixTimeMilliseconds();
+            var weekEnd = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            return await AggregateStatsAsync(weekStart, weekEnd, ct);
+        }
     }
 }

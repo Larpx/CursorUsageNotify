@@ -1,76 +1,89 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using CursorUsageNotify.GUI.Tray;
-using CursorUsageNotify.GUI.Views;
+using Larpx.PersonalTools.CursorUsageNotify.GUI.Tray;
+using Larpx.PersonalTools.CursorUsageNotify.GUI.Views;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-namespace CursorUsageNotify.GUI;
 
-/// <summary>
-/// 应用入口：负责在框架初始化完成后从 DI 容器解析 MainWindow 与 TrayIconHost，
-/// 并管理 Generic Host 生命周期。
-/// </summary>
-public partial class App : Application
+namespace Larpx.PersonalTools.CursorUsageNotify.GUI
 {
-    private IServiceProvider? _services;
-    private IHost? _host;
-    private TrayIconHost? _trayHost;
-
-    /// <summary>由 Program.cs 在启动前注入的 DI 容器。</summary>
-    public static IServiceProvider Services { get; private set; } = default!;
-
-    /// <summary>由 Program.cs 在启动前注入的 Host 实例。</summary>
-    public static IHost HostInstance { get; private set; } = default!;
-
     /// <summary>
-    /// 由 Program.cs 调用，注入 DI 容器与 Host。
-    /// 必须在 Avalonia 启动前调用。
+    /// 应用入口：负责在框架初始化完成后从 DI 容器解析 MainWindow 与 TrayIconHost，
+    /// 并管理 Generic Host 生命周期。
     /// </summary>
-    public static void Configure(IServiceProvider services, IHost host)
+    public partial class App : Application
     {
-        Services = services;
-        HostInstance = host;
-    }
+        private IServiceProvider? _services;
+        private IHost? _host;
+        private TrayIconHost? _trayHost;
 
-    public override void Initialize()
-    {
-        AvaloniaXamlLoader.Load(this);
-    }
+        /// <summary>
+        /// 由 Program.cs 在启动前注入的 DI 容器。
+        /// </summary>
+        public static IServiceProvider Services { get; private set; } = default!;
 
-    public override void OnFrameworkInitializationCompleted()
-    {
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        /// <summary>
+        /// 由 Program.cs 在启动前注入的 Host 实例。
+        /// </summary>
+        public static IHost HostInstance { get; private set; } = default!;
+
+        /// <summary>
+        /// 由 Program.cs 调用，注入 DI 容器与 Host。
+        /// 必须在 Avalonia 启动前调用。
+        /// </summary>
+        public static void Configure(IServiceProvider services, IHost host)
         {
-            _services = Services;
-            _host = HostInstance;
-
-            // 从 DI 解析主窗口（构造函数注入三个 ViewModel）
-            var mainWindow = _services.GetRequiredService<MainWindow>();
-            desktop.MainWindow = mainWindow;
-
-            // 创建托盘（传入退出动作）
-            _trayHost = _services.GetRequiredService<TrayIconHost>();
-
-            // 应用退出时清理资源
-            desktop.ShutdownRequested += OnShutdownRequested;
+            Services = services;
+            HostInstance = host;
         }
 
-        base.OnFrameworkInitializationCompleted();
-    }
-
-    private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
-    {
-        try
+        /// <summary>
+        /// 加载 Avalonia XAML 资源，初始化应用界面。
+        /// </summary>
+        public override void Initialize()
         {
-            _trayHost?.Dispose();
-            _host?.StopAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
-            _host?.Dispose();
+            AvaloniaXamlLoader.Load(this);
         }
-        catch
+
+        /// <summary>
+        /// 框架初始化完成回调：从 DI 解析主窗口与托盘宿主，
+        /// 注册退出清理回调并完成基础设置。
+        /// </summary>
+        public override void OnFrameworkInitializationCompleted()
         {
-            // 退出阶段忽略清理异常，避免阻塞关闭
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                _services = Services;
+                _host = HostInstance;
+
+                // 从 DI 解析主窗口（构造函数注入三个 ViewModel）
+                var mainWindow = _services.GetRequiredService<MainWindow>();
+                desktop.MainWindow = mainWindow;
+
+                // 创建托盘（传入退出动作）
+                _trayHost = _services.GetRequiredService<TrayIconHost>();
+
+                // 应用退出时清理资源
+                desktop.ShutdownRequested += OnShutdownRequested;
+            }
+
+            base.OnFrameworkInitializationCompleted();
+        }
+
+        private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
+        {
+            try
+            {
+                _trayHost?.Dispose();
+                _host?.StopAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
+                _host?.Dispose();
+            }
+            catch
+            {
+                // 退出阶段忽略清理异常，避免阻塞关闭
+            }
         }
     }
 }

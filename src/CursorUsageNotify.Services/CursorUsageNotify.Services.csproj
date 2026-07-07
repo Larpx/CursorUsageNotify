@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows10.0.18362.0</TargetFramework>
-    <RootNamespace>CursorUsageNotify.Services</RootNamespace>
+    <RootNamespace>Larpx.PersonalTools.CursorUsageNotify.Services</RootNamespace>
     <SupportedOSPlatformVersion>10.0.18362.0</SupportedOSPlatformVersion>
   </PropertyGroup>
 

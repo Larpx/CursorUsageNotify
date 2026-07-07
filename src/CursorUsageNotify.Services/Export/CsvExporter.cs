@@ -1,42 +1,47 @@
-using System.Globalization;
-using CursorUsageNotify.Models.Entities;
+﻿using System.Globalization;
+using Larpx.PersonalTools.CursorUsageNotify.Models.Entities;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace CursorUsageNotify.Services.Export;
 
-/// <summary>
-/// 基于 CsvHelper 的 CSV 导出实现。
-/// </summary>
-public sealed class CsvExporter : ICsvExporter
+namespace Larpx.PersonalTools.CursorUsageNotify.Services.Export
 {
-    private readonly ILogger<CsvExporter> _logger;
-
-    public CsvExporter(ILogger<CsvExporter> logger)
+    /// <summary>
+    /// 基于 CsvHelper 的 CSV 导出实现。
+    /// </summary>
+    public sealed class CsvExporter : ICsvExporter
     {
-        _logger = logger;
-    }
+        private readonly ILogger<CsvExporter> _logger;
 
-    /// <inheritdoc/>
-    public async Task ExportAsync(IEnumerable<UsageEventEntity> events, string outputPath, CancellationToken ct = default)
-    {
-        var dir = Path.GetDirectoryName(outputPath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+        /// <summary>
+        /// 初始化 <see cref="CsvExporter"/> 实例。
+        /// </summary>
+        public CsvExporter(ILogger<CsvExporter> logger)
         {
-            Directory.CreateDirectory(dir);
+            _logger = logger;
         }
 
-        var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+        /// <inheritdoc/>
+        public async Task ExportAsync(IEnumerable<UsageEventEntity> events, string outputPath, CancellationToken ct = default)
         {
-            HasHeaderRecord = true,
-            Delimiter = ","
-        };
+            var dir = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
 
-        await using var writer = new StreamWriter(outputPath, append: false);
-        await using var csv = new CsvWriter(writer, config);
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HasHeaderRecord = true,
+                Delimiter = ","
+            };
 
-        await csv.WriteRecordsAsync(events, ct);
-        _logger.LogInformation("已导出 CSV：{Path}", outputPath);
+            await using var writer = new StreamWriter(outputPath, append: false);
+            await using var csv = new CsvWriter(writer, config);
+
+            await csv.WriteRecordsAsync(events, ct);
+            _logger.LogInformation("已导出 CSV：{Path}", outputPath);
+        }
     }
 }

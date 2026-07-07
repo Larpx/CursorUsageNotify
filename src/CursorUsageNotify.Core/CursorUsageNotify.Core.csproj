@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <RootNamespace>CursorUsageNotify.Core</RootNamespace>
+    <RootNamespace>Larpx.PersonalTools.CursorUsageNotify.Core</RootNamespace>
   </PropertyGroup>
 
 </Project>
