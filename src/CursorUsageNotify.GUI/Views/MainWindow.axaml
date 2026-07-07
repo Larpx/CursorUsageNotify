@@ -8,7 +8,7 @@
         x:Class="Larpx.PersonalTools.CursorUsageNotify.GUI.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="/Assets/app.ico"
-        Title="Cursor 用量通知"
+        Title="Cursor用量统计  v1.0.0  -  by Larpx"
         Width="1200" Height="650"
         MinWidth="1000" MinHeight="550"
         WindowStartupLocation="CenterScreen">

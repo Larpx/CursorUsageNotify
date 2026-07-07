@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Net.Http;
 using System.IO;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.Messaging;
@@ -22,6 +23,7 @@ using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Extensions.Http;
 using Serilog;
+using Serilog.Settings.Configuration;
 
 
 namespace Larpx.PersonalTools.CursorUsageNotify.GUI
@@ -29,12 +31,18 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI
     /// <summary>
     /// 程序入口：构建 Generic Host + 启动 Avalonia。
     /// Host 必须在 Avalonia 启动前 Start，确保后台 HostedService 与 UI 同步运行。
+    /// 全程由全局异常处理保护，避免任何线程未捕获异常导致进程闪退。
     /// </summary>
     internal sealed class Program
     {
+        private const uint MbIconError = 0x10;
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern int MessageBox(IntPtr hWnd, string text, string caption, uint type);
+
         /// <summary>
-        /// 程序主入口：构建 Host、初始化数据库、启动 Avalonia 桌面生命周期，
-        /// 退出时优雅关闭 Host 并刷新日志。
+        /// 程序主入口：构建 Host、初始化数据库、启动 Avalonia 桌面生命周期。
+        /// 所有阶段由全局异常处理保护，崩溃时显示对话框提示用户而非闪退。
         /// </summary>
         /// <param name="args">
         /// 命令行参数。
@@ -42,32 +50,70 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI
         [STAThread]
         public static void Main(string[] args)
         {
-            var host = BuildHost(args);
+            // 启动最早期初始化 fallback logger，确保全局异常处理器有日志可写。
+            // 必须在订阅异常事件之前完成，否则异常触发时 Log.Logger 仍为 null。
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Information()
+                .WriteTo.File("logs/crash-.log", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14)
+                .CreateLogger();
 
-            // 建表（在 Host 启动前确保数据库 schema 就绪）
+            // 全局异常兜底：AppDomain 未处理异常 + 未观察 Task 异常。
+            // 任何线程未捕获的异常都记录日志，避免静默丢失导致问题难以诊断。
+            AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
+            TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
+            IHost? host = null;
             try
             {
-                host.Services.GetRequiredService<IDbContext>().InitializeSchema();
+                host = BuildHost(args);
+
+                // 建表（在 Host 启动前确保数据库 schema 就绪）
+                try
+                {
+                    host.Services.GetRequiredService<IDbContext>().InitializeSchema();
+                }
+                catch (Exception ex)
+                {
+                    Log.Logger.Fatal(ex, "数据库初始化失败，程序退出");
+                    ShowCrashDialog("数据库初始化失败", ex);
+                    return;
+                }
+
+                host.Start();
+
+                // 注入 DI 容器到 App（必须在 Avalonia 初始化前）
+                App.Configure(host.Services, host);
+
+                BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
             }
             catch (Exception ex)
             {
-                Log.Logger.Fatal(ex, "数据库初始化失败，程序退出");
-                throw;
-            }
-
-            host.Start();
-
-            // 注入 DI 容器到 App（必须在 Avalonia 初始化前）
-            App.Configure(host.Services, host);
-
-            try
-            {
-                BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+                // 启动/运行期未预期异常：记录日志并提示用户，避免控制台窗口闪退无任何线索
+                Log.Logger.Fatal(ex, "程序发生致命异常");
+                ShowCrashDialog("程序运行失败", ex);
             }
             finally
             {
-                host.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
-                host.Dispose();
+                // 优雅关闭 Host，确保后台服务有机会刷新数据
+                if (host is not null)
+                {
+                    try
+                    {
+                        host.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Warning(ex, "Host 关闭过程异常（已忽略）");
+                    }
+                    try
+                    {
+                        host.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Warning(ex, "Host 释放过程异常（已忽略）");
+                    }
+                }
                 Log.CloseAndFlush();
             }
         }
@@ -81,6 +127,58 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI
                 .WithInterFont()
                 .LogToTrace();
 
+        /// <summary>
+        /// AppDomain 未处理异常兜底：记录致命日志后由运行时决定是否终止进程。
+        /// .NET Core/5+ 中此事件触发通常意味着进程即将终止，无法阻止。
+        /// </summary>
+        /// <param name="sender">事件发送方。</param>
+        /// <param name="e">未处理异常参数。</param>
+        private static void OnDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            if (e.ExceptionObject is Exception ex)
+            {
+                Log.Logger.Fatal(ex, "AppDomain 未处理异常（IsTerminating={IsTerminating}）", e.IsTerminating);
+            }
+            else
+            {
+                Log.Logger.Fatal("AppDomain 未处理异常：{ExceptionObject}", e.ExceptionObject);
+            }
+            Log.CloseAndFlush();
+        }
+
+        /// <summary>
+        /// 未观察 Task 异常兜底：标记已观察防止进程崩溃，记录错误日志便于诊断。
+        /// </summary>
+        /// <param name="sender">事件发送方。</param>
+        /// <param name="e">未观察 Task 异常参数。</param>
+        private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+        {
+            Log.Logger.Error(e.Exception, "未观察的 Task 异常（已吸收，防止进程崩溃）");
+            e.SetObserved();
+        }
+
+        /// <summary>
+        /// 显示崩溃对话框：通过 Win32 MessageBox 提示用户，避免依赖 Avalonia（崩溃时 UI 可能不可用）。
+        /// 对话框自身失败时静默吞掉，避免二次异常。
+        /// </summary>
+        /// <param name="title">对话框标题前缀。</param>
+        /// <param name="ex">触崩溃的异常。</param>
+        private static void ShowCrashDialog(string title, Exception ex)
+        {
+            try
+            {
+                var message = $"{title}\n\n" +
+                              $"错误类型：{ex.GetType().Name}\n" +
+                              $"错误信息：{ex.Message}\n\n" +
+                              $"详细信息请查看 logs 目录下的日志文件。";
+                MessageBox(IntPtr.Zero, message, "Cursor用量统计", MbIconError);
+            }
+            catch
+            {
+                // 对话框显示失败时忽略，避免崩溃处理本身再次抛出
+            }
+        }
+
         private static IHost BuildHost(string[] args)
         {
             var builder = Host.CreateApplicationBuilder(args);
@@ -88,9 +186,15 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI
             // 显式加载 appsettings.json（Host.CreateApplicationBuilder 默认会加载，这里确保可选模式）
             builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: false);
 
-            // 配置 Serilog
+            // 配置 Serilog（覆盖 fallback logger，使用 appsettings.json 中的完整配置）。
+            // SingleFile 发布后 Serilog.Settings.Configuration 无法反射扫描程序集查找 sink，
+            // 必须通过 ConfigurationReaderOptions 显式声明 sink 所在程序集，否则启动时抛
+            // InvalidOperationException: No Serilog:Using configuration section is defined。
+            var serilogReaderOptions = new ConfigurationReaderOptions(
+                typeof(Serilog.ConsoleLoggerConfigurationExtensions).Assembly,
+                typeof(Serilog.FileLoggerConfigurationExtensions).Assembly);
             Log.Logger = new LoggerConfiguration()
-                .ReadFrom.Configuration(builder.Configuration)
+                .ReadFrom.Configuration(builder.Configuration, serilogReaderOptions)
                 .CreateLogger();
             builder.Logging.AddSerilog(Log.Logger, dispose: true);
 

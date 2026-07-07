@@ -2,7 +2,6 @@ using CommunityToolkit.WinUI.Notifications;
 using Larpx.PersonalTools.CursorUsageNotify.Core;
 using Microsoft.Extensions.Logging;
 
-
 namespace Larpx.PersonalTools.CursorUsageNotify.Services.Notifications
 {
     /// <summary>

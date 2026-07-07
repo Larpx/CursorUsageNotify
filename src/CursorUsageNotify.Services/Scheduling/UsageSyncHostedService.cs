@@ -11,6 +11,7 @@ using Larpx.PersonalTools.CursorUsageNotify.Services.Security;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Storage;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Serilog;
 
 
 namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
@@ -29,6 +30,16 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
         private readonly TokenProtector _protector;
         private readonly AppSettings _settings;
         private readonly ILogger<UsageSyncHostedService> _logger;
+
+        // RawJson 序列化专用 options：显式启用反射 TypeInfoResolver，
+        // 避免 .NET 10 在 publish 配置下默认 source-gen resolver 无法处理
+        // ExtraFields（Dictionary<string, object>）反序列化后产生的 JsonElement。
+        private static readonly JsonSerializerOptions RawJsonOptions = new()
+        {
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
+        };
 
         /// <summary>
         /// 初始化 <see cref="UsageSyncHostedService"/> 实例并注入所需依赖。
@@ -374,8 +385,29 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
                 FastPremiumRequests = 0,
                 // remaining 为剩余额度（美分），复用此字段展示
                 RemainingRequests = dto.RemainingCents,
-                RawJson = JsonSerializer.Serialize(dto)
+                RawJson = SafeSerialize(dto)
             };
+        }
+
+        /// <summary>
+        /// 安全序列化 DTO 为 JSON 字符串：使用显式启用反射的 RawJsonOptions，
+        /// 失败时记录日志并返回 null，避免 RawJson 字段问题阻断同步主流程。
+        /// </summary>
+        /// <typeparam name="T">待序列化的类型。</typeparam>
+        /// <param name="value">待序列化的实例。</param>
+        /// <returns>JSON 字符串；序列化失败时返回 null。</returns>
+        private static string? SafeSerialize<T>(T value)
+        {
+            try
+            {
+                return JsonSerializer.Serialize(value, RawJsonOptions);
+            }
+            catch (Exception ex)
+            {
+                // RawJson 仅用于诊断扩展字段，序列化失败不应阻断入库；用 Serilog 静态 logger 记录
+                Log.Logger.Warning(ex, "RawJson 序列化失败（类型：{Type}）", typeof(T).Name);
+                return null;
+            }
         }
 
         /// <summary>
@@ -426,7 +458,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
                 InvoiceCount = invoices?.Invoices?.Count ?? invoices?.Total ?? 0,
                 // 无 email API，用 profile.handle 作为用户标识
                 Email = profile?.Profile?.Handle,
-                RawJson = JsonSerializer.Serialize(new
+                RawJson = SafeSerialize(new
                 {
                     stripe,
                     cycle,

@@ -7,6 +7,25 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <SupportedOSPlatformVersion>10.0.18362.0</SupportedOSPlatformVersion>
+
+    <!-- 程序元数据：程序名称 Cursor用量统计，作者 Larpx。
+         AssemblyName 保持英文以兼容 Avalonia avares:// 资源 URI（host 段需匹配程序集名），
+         exe 文件名通过 PublishAfterRename target 重命名为中文。 -->
+    <AssemblyName>CursorUsageNotify.GUI</AssemblyName>
+    <AssemblyTitle>Cursor用量统计</AssemblyTitle>
+    <Product>Cursor用量统计</Product>
+    <Company>Larpx</Company>
+    <Authors>Larpx</Authors>
+    <Copyright>Copyright © 2026 Larpx</Copyright>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <Description>Cursor 用量统计桌面应用 - 定时拉取 Cursor Dashboard API，本地存储并可视化展示用量数据，支持系统托盘与 Toast 通知。</Description>
+    <PackageProjectUrl>https://gitee.com/DLarpx/CursorUsageNotify</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- MainWindow 使用 DI 注入构造函数，无需 XAML 运行时加载器实例化 -->
+    <NoWarn>$(NoWarn);AVLN3001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
