@@ -48,6 +48,13 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             _repository = repository;
             _syncOptions = syncOptions;
             _userPrefs = userPrefs;
+
+            // 从持久化偏好恢复 Token 显示格式
+            _tokenDisplayMode = userPrefs.TokenDisplayMode;
+            _tokenFormatLabel = GetLabelForMode(userPrefs.TokenDisplayMode);
+            _syncOptions.TokenDisplayMode = userPrefs.TokenDisplayMode;
+            TokenFormatConverter.Mode = userPrefs.TokenDisplayMode;
+
             Messenger.Register<UsageDataFetchedMessage>(this, OnDataFetched);
             Messenger.Register<SyncFailedMessage>(this, OnSyncFailed);
             Messenger.Register<SyncStartedMessage>(this, OnSyncStarted);
@@ -55,6 +62,21 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             Messenger.Register<EndpointDegradedMessage>(this, OnEndpointDegraded);
             Messenger.Register<TokenStorageUnavailableMessage>(this, OnTokenStorageUnavailable);
             _ = LoadAsync();
+        }
+
+        /// <summary>
+        /// 根据 Token 显示格式返回对应的按钮标签文本。
+        /// </summary>
+        /// <param name="mode">Token 显示格式。</param>
+        /// <returns>按钮标签。</returns>
+        private static string GetLabelForMode(TokenDisplayMode mode)
+        {
+            return mode switch
+            {
+                TokenDisplayMode.Wan => "当前Token显示格式：万",
+                TokenDisplayMode.Million => "当前Token显示格式：百万",
+                _ => "当前Token显示格式：全部"
+            };
         }
 
         /// <summary>
@@ -434,13 +456,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 TokenDisplayMode.Wan => TokenDisplayMode.Million,
                 _ => TokenDisplayMode.FullNumber
             };
-            TokenFormatLabel = TokenDisplayMode switch
-            {
-                TokenDisplayMode.FullNumber => "当前Token显示格式：全部",
-                TokenDisplayMode.Wan => "当前Token显示格式：万",
-                TokenDisplayMode.Million => "当前Token显示格式：百万",
-                _ => "当前Token显示格式：全部"
-            };
+            TokenFormatLabel = GetLabelForMode(TokenDisplayMode);
 
             // 同步共享状态：Services 通知读取 _syncOptions.TokenDisplayMode，
             // GUI 转换器读取 TokenFormatConverter.Mode

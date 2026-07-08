@@ -11,22 +11,28 @@
 
         <!-- 顶部筛选区 -->
         <Border DockPanel.Dock="Top" Padding="16,12" Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal" Spacing="12">
-                <TextBlock Text="起始：" VerticalAlignment="Center"/>
-                <DatePicker SelectedDate="{Binding StartTime}"/>
+            <StackPanel Orientation="Vertical" Spacing="6">
+                <!-- 第一行：日期 + 模型筛选 -->
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock Text="起始：" VerticalAlignment="Center"/>
+                    <DatePicker SelectedDate="{Binding StartTime}"/>
 
-                <TextBlock Text="结束：" VerticalAlignment="Center"/>
-                <DatePicker SelectedDate="{Binding EndTime}"/>
+                    <TextBlock Text="结束：" VerticalAlignment="Center"/>
+                    <DatePicker SelectedDate="{Binding EndTime}"/>
 
-                <TextBlock Text="模型：" VerticalAlignment="Center"/>
-                <ComboBox ItemsSource="{Binding Models}"
-                          SelectedItem="{Binding SelectedModel}"
-                          PlaceholderText="全部"
-                          MinWidth="160"/>
-                <Button Content="重置" Command="{Binding ResetModelCommand}" ToolTip.Tip="取消模型筛选，显示全部"/>
+                    <TextBlock Text="模型：" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding Models}"
+                              SelectedItem="{Binding SelectedModel}"
+                              PlaceholderText="全部"
+                              MinWidth="160"/>
+                </StackPanel>
 
-                <Button Content="查询" Command="{Binding LoadCommand}"/>
-                <Button Content="导出 CSV" Command="{Binding ExportCsvCommand}"/>
+                <!-- 第二行：操作按钮（靠右） -->
+                <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+                    <Button Content="重置" Command="{Binding ResetModelCommand}" ToolTip.Tip="取消模型筛选，显示全部"/>
+                    <Button Content="查询" Command="{Binding LoadCommand}"/>
+                    <Button Content="导出 CSV" Command="{Binding ExportCsvCommand}"/>
+                </StackPanel>
             </StackPanel>
         </Border>
 

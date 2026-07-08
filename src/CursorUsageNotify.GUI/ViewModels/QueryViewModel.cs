@@ -51,6 +51,11 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         {
             _repository = repository;
             _csvExporter = csvExporter;
+
+            // 日期默认：昨天 → 今天
+            StartTime = DateTime.Today.AddDays(-1);
+            EndTime = DateTime.Today;
+
             Messenger.Register<UsageDataFetchedMessage>(this, async (_, _) => await LoadAsync());
             Messenger.Register<TokenFormatChangedMessage>(this, OnTokenFormatChanged);
             _ = LoadModelsAsync();

@@ -9,7 +9,7 @@
         x:DataType="vm:MainViewModel"
         Icon="/Assets/app.ico"
         Title="Cursor用量统计  v1.0.0  -  by Larpx"
-        Width="1200" Height="650"
+        Width="1200" Height="550"
         MinWidth="1000" MinHeight="550"
         WindowStartupLocation="CenterScreen">
 
