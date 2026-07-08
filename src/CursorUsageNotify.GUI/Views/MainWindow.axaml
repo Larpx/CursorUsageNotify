@@ -19,6 +19,34 @@
         <conv:TokenFormatConverter x:Key="TokenFormat"/>
     </Window.Resources>
 
+    <!-- 格式切换按钮样式：hover/pressed 保持深灰底白字 -->
+    <Window.Styles>
+        <!-- 默认 -->
+        <Style Selector="Button.TokenFormatBtn">
+            <Setter Property="Background" Value="#FF374151"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.TokenFormatBtn /template/ ContentPresenter">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <!-- hover -->
+        <Style Selector="Button.TokenFormatBtn:pointerover">
+            <Setter Property="Background" Value="#FF4B5563"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.TokenFormatBtn:pointerover /template/ ContentPresenter">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <!-- pressed -->
+        <Style Selector="Button.TokenFormatBtn:pressed">
+            <Setter Property="Background" Value="#FF1F2937"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.TokenFormatBtn:pressed /template/ ContentPresenter">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+    </Window.Styles>
+
     <DockPanel LastChildFill="True">
 
         <!-- 同步进度条：IsSyncing 为 true 时显示滚动动画，避免误以为卡顿 -->
@@ -93,13 +121,12 @@
                     </StackPanel>
 
                     <!-- Token 格式切换按钮 -->
-                    <Button Command="{Binding CycleTokenFormatCommand}"
+                    <Button Classes="TokenFormatBtn"
+                            Command="{Binding CycleTokenFormatCommand}"
                             Content="{Binding TokenFormatLabel}"
                             ToolTip.Tip="切换 Token 显示格式：全部 / 万 / 百万"
                             Padding="10,4"
                             FontSize="12"
-                            Background="#FF374151"
-                            Foreground="White"
                             Margin="8,0,0,0"
                             VerticalAlignment="Center"/>
                 </StackPanel>
@@ -168,16 +195,6 @@
             </StackPanel>
         </Border>
 
-        <!-- TabControl -->
-        <TabControl x:Name="MainTabs" Padding="0">
-            <TabItem Header="查询">
-                <ContentControl x:Name="QueryTabContent" Content="{Binding .}"/>
-            </TabItem>
-            <TabItem Header="设置">
-                <ContentControl x:Name="SettingsTabContent" Content="{Binding .}"/>
-            </TabItem>
-        </TabControl>
-
         <!-- 底部状态栏：状态灯 + 状态文本（含报错） + 最近拉取时间 -->
         <Border DockPanel.Dock="Bottom" Background="#FFF3F4F6" BorderBrush="#FFE5E7EB" BorderThickness="0,1,0,0" Padding="12,6">
             <Grid ColumnDefinitions="Auto,*,Auto">
@@ -194,6 +211,16 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <!-- TabControl：LastChildFill 自动填充剩余空间 -->
+        <TabControl x:Name="MainTabs" Padding="0">
+            <TabItem Header="查询">
+                <ContentControl x:Name="QueryTabContent" Content="{Binding .}"/>
+            </TabItem>
+            <TabItem Header="设置">
+                <ContentControl x:Name="SettingsTabContent" Content="{Binding .}"/>
+            </TabItem>
+        </TabControl>
 
     </DockPanel>
 

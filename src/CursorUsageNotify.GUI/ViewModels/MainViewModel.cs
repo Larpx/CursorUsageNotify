@@ -178,7 +178,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         /// 当前 Token 显示格式标签（按钮上显示）。
         /// </summary>
         [ObservableProperty]
-        private string _tokenFormatLabel = "全部";
+        private string _tokenFormatLabel = "当前Token显示格式：全部";
 
         /// <summary>
         /// 当前 Token 显示格式。
@@ -429,10 +429,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             };
             TokenFormatLabel = TokenDisplayMode switch
             {
-                TokenDisplayMode.FullNumber => "全部",
-                TokenDisplayMode.Wan => "万",
-                TokenDisplayMode.Million => "百万",
-                _ => "全部"
+                TokenDisplayMode.FullNumber => "当前Token显示格式：全部",
+                TokenDisplayMode.Wan => "当前Token显示格式：万",
+                TokenDisplayMode.Million => "当前Token显示格式：百万",
+                _ => "当前Token显示格式：全部"
             };
 
             // 同步共享状态：Services 通知读取 _syncOptions.TokenDisplayMode，
