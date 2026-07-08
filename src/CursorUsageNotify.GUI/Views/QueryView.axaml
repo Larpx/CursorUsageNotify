@@ -1,18 +1,11 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels"
-             xmlns:conv="using:Larpx.PersonalTools.CursorUsageNotify.GUI.Converters"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
              x:Class="Larpx.PersonalTools.CursorUsageNotify.GUI.Views.QueryView"
              x:DataType="vm:QueryViewModel">
-
-    <UserControl.Resources>
-        <conv:CentsToCurrencyConverter x:Key="CentsToCurrency"/>
-        <conv:EpochToDateTimeConverter x:Key="EpochToDate"/>
-        <conv:TokenFormatConverter x:Key="TokenFormat"/>
-    </UserControl.Resources>
 
     <DockPanel LastChildFill="True">
 
@@ -70,26 +63,25 @@
             </Grid>
         </Border>
 
-        <!-- DataGrid：启用虚拟化避免缩放卡顿，列宽固定减少布局重算 -->
+        <!-- DataGrid：数据预计算为字符串，无转换器调用，滚动零开销 -->
         <DataGrid ItemsSource="{Binding Events}"
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
                   GridLinesVisibility="Horizontal"
                   BorderThickness="1"
                   BorderBrush="#FFE5E7EB"
-                  HeadersVisibility="Column"
-                  ScrollViewer.IsScrollChainingEnabled="True">
+                  HeadersVisibility="Column">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="时间"
-                                    Binding="{Binding Timestamp, Converter={StaticResource EpochToDate}, Mode=OneWay}"
+                                    Binding="{Binding FormattedTimestamp}"
                                     Width="170"/>
                 <DataGridTextColumn Header="模型" Binding="{Binding Model}" Width="180"/>
-                <DataGridTextColumn Header="输入 Token" Binding="{Binding InputTokens, Converter={StaticResource TokenFormat}}" Width="110"/>
-                <DataGridTextColumn Header="输出 Token" Binding="{Binding OutputTokens, Converter={StaticResource TokenFormat}}" Width="110"/>
-                <DataGridTextColumn Header="缓存读" Binding="{Binding CacheReadTokens, Converter={StaticResource TokenFormat}}" Width="110"/>
-                <DataGridTextColumn Header="缓存写" Binding="{Binding CacheWriteTokens, Converter={StaticResource TokenFormat}}" Width="110"/>
+                <DataGridTextColumn Header="输入 Token" Binding="{Binding FormattedInputTokens}" Width="110"/>
+                <DataGridTextColumn Header="输出 Token" Binding="{Binding FormattedOutputTokens}" Width="110"/>
+                <DataGridTextColumn Header="缓存读" Binding="{Binding FormattedCacheReadTokens}" Width="110"/>
+                <DataGridTextColumn Header="缓存写" Binding="{Binding FormattedCacheWriteTokens}" Width="110"/>
                 <DataGridTextColumn Header="费用"
-                                    Binding="{Binding TotalCents, Converter={StaticResource CentsToCurrency}, Mode=OneWay}"
+                                    Binding="{Binding FormattedCost}"
                                     Width="90"/>
                 <DataGridCheckBoxColumn Header="Max" Binding="{Binding MaxMode}" Width="60"/>
                 <DataGridCheckBoxColumn Header="Headless" Binding="{Binding IsHeadless}" Width="80"/>

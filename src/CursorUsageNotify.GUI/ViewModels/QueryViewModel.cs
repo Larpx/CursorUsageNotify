@@ -4,7 +4,9 @@ using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using Larpx.PersonalTools.CursorUsageNotify.GUI.Converters;
 using Larpx.PersonalTools.CursorUsageNotify.Models;
+using Larpx.PersonalTools.CursorUsageNotify.Models.Dtos;
 using Larpx.PersonalTools.CursorUsageNotify.Models.Entities;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Export;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Messages;
@@ -20,6 +22,11 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
     {
         private readonly IUsageRepository _repository;
         private readonly ICsvExporter _csvExporter;
+
+        /// <summary>
+        /// 当前页原始实体（仅用于 CSV 导出，不绑定到 UI）。
+        /// </summary>
+        private List<UsageEventEntity> _rawEntities = new();
 
         /// <summary>
         /// 每页行数可选项。
@@ -95,10 +102,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         private List<string> _models = new();
 
         /// <summary>
-        /// 当前页用量事件列表。
+        /// 当前页用量事件列表（预计算格式化字符串，避免滚动时转换器开销）。
         /// </summary>
         [ObservableProperty]
-        private List<UsageEventEntity> _events = new();
+        private List<UsageEventDisplayModel> _events = new();
 
         /// <summary>
         /// 状态文本（如：共 N 条、已导出到 ...）。
@@ -195,14 +202,19 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         }
 
         /// <summary>
-        /// Token 格式切换后强制 DataGrid 重渲染：先置空再还原快照。
-        /// 行数通常 &lt;1000，性能可接受。
+        /// Token 格式切换后重新计算所有行的格式化 Token 字符串，替换列表触发重渲染。
+        /// 预计算模式下仅重新生成字符串（无转换器调用），10~100 行开销极低。
         /// </summary>
         private void OnTokenFormatChanged(object recipient, TokenFormatChangedMessage msg)
         {
-            var snapshot = Events;
-            Events = new List<UsageEventEntity>();
-            Events = snapshot;
+            var mode = msg.Mode;
+            foreach (var item in Events)
+            {
+                item.RefreshTokenFormat(mode);
+            }
+
+            // 替换列表触发 DataGrid 重新绑定（不销毁视觉树，仅更新单元格文本）
+            Events = new List<UsageEventDisplayModel>(Events);
         }
 
         /// <summary>
@@ -219,7 +231,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 : 0;
 
             var result = await _repository.QueryEventsPagedAsync(startMs, endMs, SelectedModel, PageIndex, PageSize);
-            Events = result.Items;
+            _rawEntities = result.Items;
+            var mode = TokenFormatConverter.Mode;
+            Events = result.Items.Select(e => UsageEventDisplayModel.FromEntity(e, mode)).ToList();
             TotalCount = result.TotalCount;
             TotalPages = result.TotalPages;
             StatusText = PageSummary;
@@ -240,7 +254,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         [RelayCommand]
         private async Task ExportCsvAsync()
         {
-            if (Events.Count == 0)
+            if (_rawEntities.Count == 0)
             {
                 StatusText = "没有数据可导出";
                 return;
@@ -276,7 +290,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             }
 
             var path = file.Path.LocalPath;
-            await _csvExporter.ExportAsync(Events, path);
+            await _csvExporter.ExportAsync(_rawEntities, path);
             StatusText = $"已导出到 {path}";
         }
 
