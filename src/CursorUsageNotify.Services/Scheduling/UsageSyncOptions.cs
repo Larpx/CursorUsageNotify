@@ -1,4 +1,6 @@
-﻿
+using Larpx.PersonalTools.CursorUsageNotify.Models;
+
+
 namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
 {
     /// <summary>
@@ -33,8 +35,14 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
         public long LastNotificationTimeMs { get; set; }
 
         /// <summary>
-        /// session token（明文，运行时使用；持久化由 TokenProtector 负责）。
+        /// 连续失败次数，用于退避策略计算下次同步间隔。
+        /// 成功同步后重置为 0。
         /// </summary>
-        public string SessionToken { get; set; } = string.Empty;
+        public int ConsecutiveFailures { get; set; }
+
+        /// <summary>
+        /// Token 全局显示格式（用户在大屏切换，后台通知读取此值格式化推送内容）。
+        /// </summary>
+        public TokenDisplayMode TokenDisplayMode { get; set; } = TokenDisplayMode.FullNumber;
     }
 }

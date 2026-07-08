@@ -1,9 +1,10 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using Larpx.PersonalTools.CursorUsageNotify.Models;
 using Larpx.PersonalTools.CursorUsageNotify.Models.Entities;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Export;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Messages;
@@ -44,6 +45,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             _repository = repository;
             _csvExporter = csvExporter;
             Messenger.Register<UsageDataFetchedMessage>(this, async (_, _) => await LoadAsync());
+            Messenger.Register<TokenFormatChangedMessage>(this, OnTokenFormatChanged);
             _ = LoadModelsAsync();
             _ = LoadAsync();
         }
@@ -190,6 +192,17 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             if (!CanGoNext) return;
             PageIndex++;
             await LoadAsync();
+        }
+
+        /// <summary>
+        /// Token 格式切换后强制 DataGrid 重渲染：先置空再还原快照。
+        /// 行数通常 &lt;1000，性能可接受。
+        /// </summary>
+        private void OnTokenFormatChanged(object recipient, TokenFormatChangedMessage msg)
+        {
+            var snapshot = Events;
+            Events = new List<UsageEventEntity>();
+            Events = snapshot;
         }
 
         /// <summary>

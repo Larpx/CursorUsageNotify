@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -16,6 +16,8 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
 {
     /// <summary>
     /// 设置 Tab：Cookie 认证 + 测试、拉取间隔、通知间隔、立即拉取、清空数据。
+    /// 真实 token 由 <see cref="SecureTokenHolder"/> 以字节形式持有，UI 仅显示掩码，
+    /// 输入框仅用于一次性提交，提交后立即清空，不在内存中保留明文 string。
     /// </summary>
     public sealed partial class SettingsViewModel : ViewModelBase
     {
@@ -23,6 +25,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         private readonly AppSettings _settings;
         private readonly UsageSyncOptions _options;
         private readonly TokenProtector _protector;
+        private readonly SecureTokenHolder _tokenHolder;
         private readonly IUsageRepository _repository;
 
         // 匹配 "WorkosCursorSessionToken=<value>"，value 为分号或结尾前的非空内容
@@ -32,7 +35,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
 
         /// <summary>
         /// 构造设置 ViewModel，注入 API 客户端、配置、运行时选项、
-        /// Token 加密保护器与仓储，启动时加载已保存的 Token。
+        /// Token 加密保护器、安全持有器与仓储。
         /// </summary>
         /// <param name="apiClient">
         /// Cursor API 客户端。
@@ -46,6 +49,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         /// <param name="protector">
         /// Token 加密保护器。
         /// </param>
+        /// <param name="tokenHolder">
+        /// 安全 token 持有器。
+        /// </param>
         /// <param name="repository">
         /// 用量数据仓储。
         /// </param>
@@ -57,6 +63,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             AppSettings settings,
             UsageSyncOptions options,
             TokenProtector protector,
+            SecureTokenHolder tokenHolder,
             IUsageRepository repository,
             IMessenger messenger)
             : base(messenger)
@@ -65,22 +72,39 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             _settings = settings;
             _options = options;
             _protector = protector;
+            _tokenHolder = tokenHolder;
             _repository = repository;
 
             SyncIntervalMinutes = _options.SyncIntervalMinutes;
             NotificationIntervalMinutes = _options.NotificationIntervalMinutes;
-            SessionToken = _options.SessionToken;
 
             PropertyChanged += OnSettingsPropertyChanged;
 
-            _ = LoadSavedTokenAsync();
+            // 订阅后台 token 状态变化（加载/清除/过期）
+            Messenger.Register<TokenStateChangedMessage>(this, (_, _) => RefreshTokenStatus());
+
+            // 初始刷新一次（后台加载早于本构造时由消息驱动；晚于时本次读取）
+            RefreshTokenStatus();
         }
 
         /// <summary>
-        /// Cursor 会话 Token（支持粘贴完整 Cookie 或纯 Token 值）。
+        /// 一次性输入框：用户粘贴新 Cookie/Token 后提交，提交后立即清空。
+        /// 不作为真实 token 长期驻留，仅绑定到输入控件。
         /// </summary>
         [ObservableProperty]
-        private string _sessionToken = string.Empty;
+        private string _inputToken = string.Empty;
+
+        /// <summary>
+        /// 是否已保存有效 token。
+        /// </summary>
+        [ObservableProperty]
+        private bool _hasToken;
+
+        /// <summary>
+        /// 掩码显示文本（"●●●●●● 已设置" 或空）。
+        /// </summary>
+        [ObservableProperty]
+        private string _tokenMaskedDisplay = string.Empty;
 
         /// <summary>
         /// 从用户输入的原始字符串中提取 WorkosCursorSessionToken 值。
@@ -103,15 +127,13 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             return raw.Trim();
         }
 
-        partial void OnSessionTokenChanged(string value)
+        /// <summary>
+        /// 刷新掩码状态：从 holder 读取 HasToken 并更新显示文本。
+        /// </summary>
+        private void RefreshTokenStatus()
         {
-            var extracted = ExtractToken(value);
-            if (extracted != value)
-            {
-                // 重新赋值触发属性变更，但需避免无限递归
-                _sessionToken = extracted;
-                OnPropertyChanged(nameof(SessionToken));
-            }
+            HasToken = _tokenHolder.HasToken;
+            TokenMaskedDisplay = HasToken ? "●●●●●● 已设置" : string.Empty;
         }
 
         /// <summary>
@@ -150,75 +172,130 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         public int[] IntervalOptions { get; } = { 30, 60, 180, 300 };
 
         /// <summary>
-        /// 测试 API 密钥是否可用。
+        /// 测试 API 密钥是否可用：从输入框提取 token，写入 holder，调用测试接口。
+        /// 成功则持久化保存；失败则清除 holder 中的临时 token。
         /// </summary>
         [RelayCommand(CanExecute = nameof(CanTest))]
         private async Task TestConnectionAsync()
         {
+            var token = ExtractToken(InputToken);
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                TestResult = "请先粘贴 Session Token";
+                TestSuccess = false;
+                return;
+            }
+
             IsTesting = true;
             TestResult = "测试中...";
             try
             {
-                var result = await _apiClient.TestConnectionAsync(SessionToken);
+                // 临时写入 holder 供测试调用
+                _tokenHolder.Set(token);
+                var result = await _tokenHolder.UseAsync(
+                    (t, ct) => _apiClient.TestConnectionAsync(t, ct), default);
+
                 if (result.IsSuccess)
                 {
                     TestSuccess = true;
                     TestResult = $"连接成功，当前周期事件数：{result.Value}";
-                    _options.SessionToken = SessionToken;
-                    await SaveTokenAsync(SessionToken);
+                    await SaveTokenAsync();
                 }
                 else
                 {
                     TestSuccess = false;
                     TestResult = result.Error ?? "未知错误";
+                    // 测试失败，清除临时写入的 token
+                    _tokenHolder.Clear();
                 }
+            }
+            catch (InvalidOperationException)
+            {
+                TestSuccess = false;
+                TestResult = "Token 处理异常，请重试";
+                _tokenHolder.Clear();
             }
             finally
             {
+                // 输入框立即清空，避免明文 string 残留
+                InputToken = string.Empty;
                 IsTesting = false;
+                RefreshTokenStatus();
                 TestConnectionCommand.NotifyCanExecuteChanged();
+                SyncNowCommand.NotifyCanExecuteChanged();
+                ClearTokenCommand.NotifyCanExecuteChanged();
             }
         }
 
-        private bool CanTest => !IsTesting && !string.IsNullOrWhiteSpace(SessionToken);
+        private bool CanTest => !IsTesting && !string.IsNullOrWhiteSpace(InputToken);
 
         /// <summary>
-        /// 保存设置（间隔变化立即生效）。
+        /// 保存设置（间隔变化立即生效）；若输入框有新 token 则一并保存。
         /// </summary>
         [RelayCommand]
         private void SaveSettings()
         {
             _options.SyncIntervalMinutes = SyncIntervalMinutes;
             _options.NotificationIntervalMinutes = NotificationIntervalMinutes;
-            _options.SessionToken = SessionToken;
 
             _settings.SyncIntervalMinutes = SyncIntervalMinutes;
             _settings.NotificationIntervalMinutes = NotificationIntervalMinutes;
 
-            SaveTokenAsync(SessionToken).FireAndForget();
+            // 若输入框有新 token，提取后写入 holder 并持久化
+            if (!string.IsNullOrWhiteSpace(InputToken))
+            {
+                var token = ExtractToken(InputToken);
+                _tokenHolder.Set(token);
+                InputToken = string.Empty;
+                SaveTokenAsync().FireAndForget();
+                RefreshTokenStatus();
+                SyncNowCommand.NotifyCanExecuteChanged();
+                ClearTokenCommand.NotifyCanExecuteChanged();
+            }
+
             TestResult = "设置已保存";
         }
 
         /// <summary>
-        /// 立即触发一次拉取。
+        /// 立即触发一次拉取（需已保存 token）。
         /// </summary>
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanSyncNow))]
         private void SyncNow()
         {
-            if (string.IsNullOrEmpty(SessionToken))
-            {
-                TestResult = "请先填写 Session Token";
-                TestSuccess = false;
-                return;
-            }
-            _options.SessionToken = SessionToken;
             Messenger.Send(new TriggerSyncNowMessage());
             TestResult = "已触发立即拉取";
         }
 
+        private bool CanSyncNow => HasToken;
+
+        /// <summary>
+        /// 清除已保存的 token（内存 + 磁盘）。
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanClearToken))]
+        private void ClearToken()
+        {
+            _tokenHolder.Clear();
+            // 清除磁盘 secrets.dat
+            try
+            {
+                if (File.Exists(_settings.SecretsPath))
+                {
+                    File.Delete(_settings.SecretsPath);
+                }
+            }
+            catch
+            {
+                // 删除失败不阻塞 UI
+            }
+            RefreshTokenStatus();
+            TestSuccess = true;
+            TestResult = "已清除保存的 Token";
+        }
+
+        private bool CanClearToken => HasToken;
+
         /// <summary>
         /// 用系统默认浏览器打开 Cursor 登录页，方便用户重新登录后复制新 cookie。
-        /// UseShellExecute=true 让系统按 URL 协议选择默认浏览器。
         /// </summary>
         [RelayCommand]
         private void OpenBrowser()
@@ -266,7 +343,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         {
             switch (e.PropertyName)
             {
-                case nameof(SessionToken):
+                case nameof(InputToken):
                     TestConnectionCommand.NotifyCanExecuteChanged();
                     break;
                 case nameof(SyncIntervalMinutes):
@@ -275,37 +352,19 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 case nameof(NotificationIntervalMinutes):
                     _options.NotificationIntervalMinutes = NotificationIntervalMinutes;
                     break;
+                case nameof(HasToken):
+                    SyncNowCommand.NotifyCanExecuteChanged();
+                    ClearTokenCommand.NotifyCanExecuteChanged();
+                    break;
             }
         }
 
         /// <summary>
-        /// 启动时从 secrets.dat 加载加密 token。
+        /// 借用 holder 中的明文 token 加密后写入 secrets.dat。
+        /// DPAPI 不可用时抛 <see cref="InvalidOperationException"/>，此处发送
+        /// <see cref="TokenStorageUnavailableMessage"/> 通知 UI 弹窗警告而非静默失败。
         /// </summary>
-        private async Task LoadSavedTokenAsync()
-        {
-            try
-            {
-                if (File.Exists(_settings.SecretsPath))
-                {
-                    var cipher = await File.ReadAllBytesAsync(_settings.SecretsPath);
-                    var plain = _protector.Decrypt(cipher);
-                    if (!string.IsNullOrEmpty(plain))
-                    {
-                        SessionToken = plain;
-                        _options.SessionToken = plain;
-                    }
-                }
-            }
-            catch
-            {
-                // 静默忽略，用户重新输入即可
-            }
-        }
-
-        /// <summary>
-        /// 加密保存 token 到 secrets.dat。
-        /// </summary>
-        private async Task SaveTokenAsync(string token)
+        private async Task SaveTokenAsync()
         {
             try
             {
@@ -314,12 +373,25 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 {
                     Directory.CreateDirectory(dir);
                 }
-                var cipher = _protector.Encrypt(token);
-                await File.WriteAllBytesAsync(_settings.SecretsPath, cipher);
+
+                await _tokenHolder.UseAsync(async (token, ct) =>
+                {
+                    var cipher = _protector.Encrypt(token);
+                    await File.WriteAllBytesAsync(_settings.SecretsPath, cipher, ct);
+                }, default);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // DPAPI 不可用：通知 UI 弹窗警告，token 未保存
+                Messenger.Send(new TokenStorageUnavailableMessage(ex.Message));
+                TestSuccess = false;
+                TestResult = "当前平台不支持加密存储，token 未保存";
+                _tokenHolder.Clear();
+                RefreshTokenStatus();
             }
             catch
             {
-                // 保存失败不阻塞 UI
+                // 其他异常保存失败不阻塞 UI
             }
         }
     }

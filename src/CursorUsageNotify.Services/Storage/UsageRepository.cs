@@ -1,4 +1,4 @@
-﻿using Larpx.PersonalTools.CursorUsageNotify.Core;
+using Larpx.PersonalTools.CursorUsageNotify.Core;
 using Larpx.PersonalTools.CursorUsageNotify.Models.Dtos;
 using Larpx.PersonalTools.CursorUsageNotify.Models.Entities;
 using Microsoft.Extensions.Logging;
@@ -183,7 +183,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
 
             return new UsageAggregateStats
             {
-                TotalTokens = events.Sum(e => e.InputTokens + e.OutputTokens),
+                TotalTokens = events.Sum(e => e.InputTokens + e.OutputTokens + e.CacheReadTokens + e.CacheWriteTokens),
                 TotalRequests = events.Count,
                 TotalSpendCents = events.Sum(e => e.ChargedCents),
                 TotalInputTokens = events.Sum(e => e.InputTokens),

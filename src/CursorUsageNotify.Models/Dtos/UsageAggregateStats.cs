@@ -1,4 +1,4 @@
-﻿
+
 namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
 {
     /// <summary>
@@ -7,7 +7,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
     public sealed class UsageAggregateStats
     {
         /// <summary>
-        /// 总 token 数（输入 + 输出）。
+        /// 总 token 数（输入 + 输出 + 缓存读 + 缓存写）。
         /// </summary>
         public long TotalTokens { get; set; }
 

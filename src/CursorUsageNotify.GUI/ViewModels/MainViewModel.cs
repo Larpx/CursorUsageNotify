@@ -3,9 +3,12 @@ using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using Larpx.PersonalTools.CursorUsageNotify.GUI.Converters;
+using Larpx.PersonalTools.CursorUsageNotify.Models;
 using Larpx.PersonalTools.CursorUsageNotify.Models.Dtos;
 using Larpx.PersonalTools.CursorUsageNotify.Models.Entities;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Messages;
+using Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Storage;
 
 
@@ -18,6 +21,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
     public sealed partial class MainViewModel : ViewModelBase
     {
         private readonly IUsageRepository _repository;
+        private readonly UsageSyncOptions _syncOptions;
 
         /// <summary>
         /// 构造数据大屏 ViewModel，注入仓储与消息总线，
@@ -29,14 +33,20 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         /// <param name="messenger">
         /// 消息总线。
         /// </param>
-        public MainViewModel(IUsageRepository repository, IMessenger messenger)
+        /// <param name="syncOptions">
+        /// 运行时同步选项（含 Token 显示格式共享状态）。
+        /// </param>
+        public MainViewModel(IUsageRepository repository, IMessenger messenger, UsageSyncOptions syncOptions)
             : base(messenger)
         {
             _repository = repository;
+            _syncOptions = syncOptions;
             Messenger.Register<UsageDataFetchedMessage>(this, OnDataFetched);
             Messenger.Register<SyncFailedMessage>(this, OnSyncFailed);
             Messenger.Register<SyncStartedMessage>(this, OnSyncStarted);
             Messenger.Register<CookieExpiringSoonMessage>(this, OnCookieExpiring);
+            Messenger.Register<EndpointDegradedMessage>(this, OnEndpointDegraded);
+            Messenger.Register<TokenStorageUnavailableMessage>(this, OnTokenStorageUnavailable);
             _ = LoadAsync();
         }
 
@@ -165,6 +175,18 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         private bool _isSyncing;
 
         /// <summary>
+        /// 当前 Token 显示格式标签（按钮上显示）。
+        /// </summary>
+        [ObservableProperty]
+        private string _tokenFormatLabel = "全部";
+
+        /// <summary>
+        /// 当前 Token 显示格式。
+        /// </summary>
+        [ObservableProperty]
+        private TokenDisplayMode _tokenDisplayMode = TokenDisplayMode.FullNumber;
+
+        /// <summary>
         /// Cookie 有效性状态文本（空表示正常，非空显示预警）。
         /// </summary>
         [ObservableProperty]
@@ -251,6 +273,24 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 CookieStatusText = $"Cookie 将在 {days} 天后过期（{msg.ExpiryUtc:yyyy-MM-dd}）";
                 CookieStatusColor = "#f59e0b";
             }
+        }
+
+        /// <summary>
+        /// 端点探测发现失效端点：在状态栏红色提示用户客户端可能需要更新。
+        /// </summary>
+        private void OnEndpointDegraded(object recipient, EndpointDegradedMessage msg)
+        {
+            StatusColor = "#dc3545";
+            StatusText = $"Cursor 接口已变更：{string.Join("、", msg.DegradedPaths)}，请检查客户端更新";
+        }
+
+        /// <summary>
+        /// Token 加密存储不可用（DPAPI 不可用）：在状态栏红色提示，避免静默失败。
+        /// </summary>
+        private void OnTokenStorageUnavailable(object recipient, TokenStorageUnavailableMessage msg)
+        {
+            StatusColor = "#dc3545";
+            StatusText = $"Token 加密存储不可用：{msg.Reason}，token 未保存";
         }
 
         /// <summary>
@@ -371,6 +411,49 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 StatusColor = "#28a745"; // 绿
                 StatusText = "已同步";
             }
+        }
+
+        /// <summary>
+        /// 循环切换 Token 全局显示格式：全部 → 万 → 百万 → 全部。
+        /// 同步更新共享状态（UsageSyncOptions + TokenFormatConverter.Mode），
+        /// 重抛 10 个 token 属性触发大屏重渲染，并广播消息让 QueryViewModel 刷新 DataGrid。
+        /// </summary>
+        [RelayCommand]
+        private void CycleTokenFormat()
+        {
+            TokenDisplayMode = TokenDisplayMode switch
+            {
+                TokenDisplayMode.FullNumber => TokenDisplayMode.Wan,
+                TokenDisplayMode.Wan => TokenDisplayMode.Million,
+                _ => TokenDisplayMode.FullNumber
+            };
+            TokenFormatLabel = TokenDisplayMode switch
+            {
+                TokenDisplayMode.FullNumber => "全部",
+                TokenDisplayMode.Wan => "万",
+                TokenDisplayMode.Million => "百万",
+                _ => "全部"
+            };
+
+            // 同步共享状态：Services 通知读取 _syncOptions.TokenDisplayMode，
+            // GUI 转换器读取 TokenFormatConverter.Mode
+            _syncOptions.TokenDisplayMode = TokenDisplayMode;
+            TokenFormatConverter.Mode = TokenDisplayMode;
+
+            // 重抛 10 个 token 属性，触发大屏 Binding 重新求值
+            OnPropertyChanged(nameof(WeekInputTokens));
+            OnPropertyChanged(nameof(WeekOutputTokens));
+            OnPropertyChanged(nameof(WeekCacheReadTokens));
+            OnPropertyChanged(nameof(WeekCacheWriteTokens));
+            OnPropertyChanged(nameof(WeekTotalTokens));
+            OnPropertyChanged(nameof(PeriodInputTokens));
+            OnPropertyChanged(nameof(PeriodOutputTokens));
+            OnPropertyChanged(nameof(PeriodCacheReadTokens));
+            OnPropertyChanged(nameof(PeriodCacheWriteTokens));
+            OnPropertyChanged(nameof(PeriodTotalTokens));
+
+            // 通知 QueryViewModel 刷新 DataGrid
+            Messenger.Send(new TokenFormatChangedMessage(TokenDisplayMode));
         }
 
         /// <summary>

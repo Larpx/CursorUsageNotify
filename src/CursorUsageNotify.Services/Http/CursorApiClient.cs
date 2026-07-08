@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Larpx.PersonalTools.CursorUsageNotify.Core;
@@ -136,7 +136,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
 
             if (!response.IsSuccessStatusCode)
             {
-                HandleError(response.StatusCode, responseBody);
+                HandleError(response.StatusCode, responseBody, path);
             }
 
             var result = JsonSerializer.Deserialize<T>(responseBody, JsonOptions);
@@ -162,7 +162,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
 
             if (!response.IsSuccessStatusCode)
             {
-                HandleError(response.StatusCode, responseBody);
+                HandleError(response.StatusCode, responseBody, path);
             }
 
             var result = JsonSerializer.Deserialize<T>(responseBody, JsonOptions);
@@ -189,6 +189,11 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
                 // 认证失败向上抛，触发 cookie 失效通知
                 throw;
             }
+            catch (CursorApiEndpointChangedException)
+            {
+                // 端点已变更：向上抛，由调用方明确通知用户而非静默失败
+                throw;
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "GET {Path} 失败（不影响事件入库）", path);
@@ -204,9 +209,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
             request.Headers.UserAgent.ParseAdd(Constants.UserAgent);
         }
 
-        private void HandleError(System.Net.HttpStatusCode statusCode, string body)
+        private void HandleError(System.Net.HttpStatusCode statusCode, string body, string path)
         {
-            _logger.LogError("Cursor API 调用失败：{StatusCode} {Body}", (int)statusCode, body);
+            _logger.LogError("Cursor API 调用失败：{Path} {StatusCode} {Body}", path, (int)statusCode, body);
 
             throw statusCode switch
             {
@@ -214,6 +219,8 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
                     => new CursorApiAuthException((int)statusCode),
                 System.Net.HttpStatusCode.BadRequest
                     => new CursorApiBadRequestException(Truncate(body, 200)),
+                System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.MethodNotAllowed
+                    => new CursorApiEndpointChangedException(path, (int)statusCode),
                 System.Net.HttpStatusCode.TooManyRequests
                     => new CursorApiRateLimitException(),
                 _ => new CursorApiException(

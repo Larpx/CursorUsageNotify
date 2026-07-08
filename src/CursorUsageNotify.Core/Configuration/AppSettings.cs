@@ -1,4 +1,4 @@
-﻿
+
 namespace Larpx.PersonalTools.CursorUsageNotify.Core.Configuration
 {
     /// <summary>
@@ -7,14 +7,15 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Core.Configuration
     public sealed class AppSettings
     {
         /// <summary>
-        /// Cursor 内部 dashboard API 的基础地址（避免本地化 URL 导致 400）。
+        /// Cursor 内部 dashboard API 的基础地址常量（避免本地化 URL 导致 400）。
         /// </summary>
         public const string DefaultApiBaseUrl = "https://cursor.com";
 
         /// <summary>
         /// Cursor 内部 dashboard API 的基础地址。
+        /// 只读属性：强制使用常量，配置 bind 无法覆盖，防止用户误配导致 token 泄露。
         /// </summary>
-        public string ApiBaseUrl { get; set; } = DefaultApiBaseUrl;
+        public string ApiBaseUrl { get; } = DefaultApiBaseUrl;
 
         /// <summary>
         /// 数据拉取间隔（分钟）。用户可在设置界面覆盖。

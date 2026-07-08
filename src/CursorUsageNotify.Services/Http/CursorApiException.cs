@@ -1,4 +1,4 @@
-﻿
+
 namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
 {
     /// <summary>
@@ -70,5 +70,33 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
         /// </summary>
         public CursorApiRateLimitException()
             : base("Cursor API 速率限制（429），请稍后重试。", 429) { }
+    }
+
+    /// <summary>
+    /// 端点已变更或失效（404 Not Found / 405 Method Not Allowed）。
+    /// 表示 Cursor 接口版本已更新，当前客户端调用的端点不存在或方法错误，
+    /// 不应静默失败，需明确提示用户更新客户端。
+    /// </summary>
+    public sealed class CursorApiEndpointChangedException : CursorApiException
+    {
+        /// <summary>
+        /// 失效的 API 端点路径。
+        /// </summary>
+        public string EndpointPath { get; }
+
+        /// <summary>
+        /// 初始化 <see cref="CursorApiEndpointChangedException"/> 实例。
+        /// </summary>
+        /// <param name="path">
+        /// 失效的 API 端点路径。
+        /// </param>
+        /// <param name="statusCode">
+        /// HTTP 状态码（404 或 405）。
+        /// </param>
+        public CursorApiEndpointChangedException(string path, int statusCode)
+            : base($"Cursor API 端点 {path} 已变更或失效（HTTP {statusCode}），可能客户端版本过旧，请检查更新。", statusCode)
+        {
+            EndpointPath = path;
+        }
     }
 }

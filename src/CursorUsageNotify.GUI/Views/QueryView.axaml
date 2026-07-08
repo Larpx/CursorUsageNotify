@@ -11,6 +11,7 @@
     <UserControl.Resources>
         <conv:CentsToCurrencyConverter x:Key="CentsToCurrency"/>
         <conv:EpochToDateTimeConverter x:Key="EpochToDate"/>
+        <conv:TokenFormatConverter x:Key="TokenFormat"/>
     </UserControl.Resources>
 
     <DockPanel LastChildFill="True">
@@ -83,10 +84,10 @@
                                     Binding="{Binding Timestamp, Converter={StaticResource EpochToDate}, Mode=OneWay}"
                                     Width="170"/>
                 <DataGridTextColumn Header="模型" Binding="{Binding Model}" Width="180"/>
-                <DataGridTextColumn Header="输入 Token" Binding="{Binding InputTokens, StringFormat=\{0:N0\}}" Width="110"/>
-                <DataGridTextColumn Header="输出 Token" Binding="{Binding OutputTokens, StringFormat=\{0:N0\}}" Width="110"/>
-                <DataGridTextColumn Header="缓存读" Binding="{Binding CacheReadTokens, StringFormat=\{0:N0\}}" Width="110"/>
-                <DataGridTextColumn Header="缓存写" Binding="{Binding CacheWriteTokens, StringFormat=\{0:N0\}}" Width="110"/>
+                <DataGridTextColumn Header="输入 Token" Binding="{Binding InputTokens, Converter={StaticResource TokenFormat}}" Width="110"/>
+                <DataGridTextColumn Header="输出 Token" Binding="{Binding OutputTokens, Converter={StaticResource TokenFormat}}" Width="110"/>
+                <DataGridTextColumn Header="缓存读" Binding="{Binding CacheReadTokens, Converter={StaticResource TokenFormat}}" Width="110"/>
+                <DataGridTextColumn Header="缓存写" Binding="{Binding CacheWriteTokens, Converter={StaticResource TokenFormat}}" Width="110"/>
                 <DataGridTextColumn Header="费用"
                                     Binding="{Binding TotalCents, Converter={StaticResource CentsToCurrency}, Mode=OneWay}"
                                     Width="90"/>

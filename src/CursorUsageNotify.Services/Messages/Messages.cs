@@ -1,4 +1,5 @@
-﻿using Larpx.PersonalTools.CursorUsageNotify.Models.Dtos;
+using Larpx.PersonalTools.CursorUsageNotify.Models;
+using Larpx.PersonalTools.CursorUsageNotify.Models.Dtos;
 using Larpx.PersonalTools.CursorUsageNotify.Models.Entities;
 
 
@@ -86,4 +87,36 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Messages
     /// 请求切换到设置 Tab（用于 Cookie 预警条"立即更新"按钮跳转）。
     /// </summary>
     public sealed record SwitchToSettingsTabMessage();
+
+    /// <summary>
+    /// Token 加密存储不可用通知（DPAPI 不可用等），UI 应弹窗警告用户而非静默失败。
+    /// </summary>
+    /// <param name="Reason">
+    /// 不可用原因。
+    /// </param>
+    public sealed record TokenStorageUnavailableMessage(string Reason);
+
+    /// <summary>
+    /// Token 状态变化通知（加载/清除/过期），UI 据此刷新掩码显示。
+    /// </summary>
+    /// <param name="HasToken">
+    /// 当前是否已持有有效 token。
+    /// </param>
+    public sealed record TokenStateChangedMessage(bool HasToken);
+
+    /// <summary>
+    /// 端点探测发现失效端点通知，UI 据此提示用户接口已变更。
+    /// </summary>
+    /// <param name="DegradedPaths">
+    /// 失效端点路径列表。
+    /// </param>
+    public sealed record EndpointDegradedMessage(IReadOnlyList<string> DegradedPaths);
+
+    /// <summary>
+    /// Token 全局显示格式已切换，订阅者（如 QueryViewModel）应刷新 DataGrid 强制重渲染。
+    /// </summary>
+    /// <param name="Mode">
+    /// 新的显示格式。
+    /// </param>
+    public sealed record TokenFormatChangedMessage(TokenDisplayMode Mode);
 }

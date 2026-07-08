@@ -62,6 +62,18 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI
             AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
+            // 单实例互斥锁：防止多实例同时写 secrets.dat / data.db 导致损坏。
+            // 使用 Local 前缀避免跨会话权限问题，单用户桌面场景足够。
+            using var singleInstanceMutex = new Mutex(
+                initiallyOwned: true,
+                name: @"Local\CursorUsageNotify_SingleInstance",
+                out bool createdNew);
+            if (!createdNew)
+            {
+                ShowCrashDialog("程序已在运行", new Exception("Cursor用量统计 已在运行，请勿重复启动。"));
+                return;
+            }
+
             IHost? host = null;
             try
             {
@@ -229,9 +241,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI
 
             // 安全
             builder.Services.AddSingleton<TokenProtector>();
+            builder.Services.AddSingleton<SecureTokenHolder>();
 
             // 后台同步服务
             builder.Services.AddHostedService<UsageSyncHostedService>();
+            // 启动端点探测：Host 启动后异步探测 7 个 Cursor 端点是否仍存在
+            builder.Services.AddHostedService<EndpointProbeService>();
 
             // ViewModel
             builder.Services.AddSingleton<MainViewModel>();
