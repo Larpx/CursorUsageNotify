@@ -10,6 +10,7 @@ using Larpx.PersonalTools.CursorUsageNotify.Core.Configuration;
 using Larpx.PersonalTools.CursorUsageNotify.GUI.Tray;
 using Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels;
 using Larpx.PersonalTools.CursorUsageNotify.GUI.Views;
+using Larpx.PersonalTools.CursorUsageNotify.Services.Configuration;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Export;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Http;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Notifications;
@@ -78,6 +79,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI
             try
             {
                 host = BuildHost(args);
+
+                // 将持久化用户偏好同步到运行时状态（UsageSyncOptions + GUI 转换器）
+                var userPrefs = host.Services.GetRequiredService<UserPreferences>();
+                var syncOptions = host.Services.GetRequiredService<UsageSyncOptions>();
+                syncOptions.TokenDisplayMode = userPrefs.TokenDisplayMode;
+                Larpx.PersonalTools.CursorUsageNotify.GUI.Converters.TokenFormatConverter.Mode = userPrefs.TokenDisplayMode;
 
                 // 建表（在 Host 启动前确保数据库 schema 就绪）
                 try
@@ -238,6 +245,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI
 
             // 运行时选项
             builder.Services.AddSingleton<UsageSyncOptions>();
+
+            // 用户偏好（从 user-prefs.json 加载，重启保留）
+            builder.Services.AddSingleton(UserPreferences.Load(appSettings.UserPrefsPath));
 
             // 安全
             builder.Services.AddSingleton<TokenProtector>();

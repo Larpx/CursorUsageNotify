@@ -3,8 +3,10 @@ using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using Larpx.PersonalTools.CursorUsageNotify.Core.Configuration;
 using Larpx.PersonalTools.CursorUsageNotify.GUI.Converters;
 using Larpx.PersonalTools.CursorUsageNotify.Models;
+using Larpx.PersonalTools.CursorUsageNotify.Services.Configuration;
 using Larpx.PersonalTools.CursorUsageNotify.Models.Dtos;
 using Larpx.PersonalTools.CursorUsageNotify.Models.Entities;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Messages;
@@ -22,6 +24,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
     {
         private readonly IUsageRepository _repository;
         private readonly UsageSyncOptions _syncOptions;
+        private readonly UserPreferences _userPrefs;
 
         /// <summary>
         /// 构造数据大屏 ViewModel，注入仓储与消息总线，
@@ -36,11 +39,15 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         /// <param name="syncOptions">
         /// 运行时同步选项（含 Token 显示格式共享状态）。
         /// </param>
-        public MainViewModel(IUsageRepository repository, IMessenger messenger, UsageSyncOptions syncOptions)
+        /// <param name="userPrefs">
+        /// 用户偏好持久化配置。
+        /// </param>
+        public MainViewModel(IUsageRepository repository, IMessenger messenger, UsageSyncOptions syncOptions, UserPreferences userPrefs)
             : base(messenger)
         {
             _repository = repository;
             _syncOptions = syncOptions;
+            _userPrefs = userPrefs;
             Messenger.Register<UsageDataFetchedMessage>(this, OnDataFetched);
             Messenger.Register<SyncFailedMessage>(this, OnSyncFailed);
             Messenger.Register<SyncStartedMessage>(this, OnSyncStarted);
@@ -439,6 +446,17 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             // GUI 转换器读取 TokenFormatConverter.Mode
             _syncOptions.TokenDisplayMode = TokenDisplayMode;
             TokenFormatConverter.Mode = TokenDisplayMode;
+
+            // 持久化到磁盘，重启后保留
+            try
+            {
+                _userPrefs.TokenDisplayMode = TokenDisplayMode;
+                _userPrefs.Save();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"保存用户偏好失败：{ex.Message}");
+            }
 
             // 重抛 10 个 token 属性，触发大屏 Binding 重新求值
             OnPropertyChanged(nameof(WeekInputTokens));

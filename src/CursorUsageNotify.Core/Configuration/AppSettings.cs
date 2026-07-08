@@ -38,6 +38,11 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Core.Configuration
         public string SecretsPath { get; set; } = DefaultSecretsPath;
 
         /// <summary>
+        /// 用户偏好文件路径（JSON 格式，存储 Token 格式等跨重启偏好）。
+        /// </summary>
+        public string UserPrefsPath { get; set; } = DefaultUserPrefsPath;
+
+        /// <summary>
         /// Serilog 日志文件路径。
         /// </summary>
         public string LogFilePath { get; set; } = DefaultLogFilePath;
@@ -69,5 +74,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Core.Configuration
         /// 默认日志文件路径。
         /// </summary>
         public static string DefaultLogFilePath => Path.Combine(AppDataDir, "logs", "app.log");
+
+        /// <summary>
+        /// 默认用户偏好文件路径。
+        /// </summary>
+        public static string DefaultUserPrefsPath => Path.Combine(AppDataDir, "user-prefs.json");
     }
 }
