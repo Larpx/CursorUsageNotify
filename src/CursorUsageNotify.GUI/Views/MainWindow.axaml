@@ -45,6 +45,26 @@
         <Style Selector="Button.TokenFormatBtn:pressed /template/ ContentPresenter">
             <Setter Property="Foreground" Value="White"/>
         </Style>
+
+        <!-- 大屏刷新按钮：深灰底白图标，hover/pressed 与 TokenFormatBtn 风格一致 -->
+        <Style Selector="Button.RefreshBtn">
+            <Setter Property="Background" Value="#FF374151"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+        <Style Selector="Button.RefreshBtn:pointerover">
+            <Setter Property="Background" Value="#FF4B5563"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.RefreshBtn:pressed">
+            <Setter Property="Background" Value="#FF1F2937"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.RefreshBtn:disabled">
+            <Setter Property="Opacity" Value="0.5"/>
+        </Style>
     </Window.Styles>
 
     <DockPanel LastChildFill="True">
@@ -83,10 +103,10 @@
 
         <!-- 顶部数据大屏 -->
         <Border DockPanel.Dock="Top" Background="#FF1F2937" Padding="24,14">
-            <StackPanel Orientation="Vertical" Spacing="10">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
 
                 <!-- 第一行：用户名(含订阅类型) + 订阅起始 + 订阅结束 + 订阅状态 + 发票数 -->
-                <StackPanel Orientation="Horizontal" Spacing="24">
+                <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="24">
                     <StackPanel Orientation="Vertical" Spacing="2" MinWidth="120">
                         <TextBlock Text="用户" FontSize="11" Foreground="#FF9CA3AF"/>
                         <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
@@ -104,11 +124,6 @@
                             <TextBlock Text="{Binding SubEndDate}" FontSize="13" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
                         </StackPanel>
                     </StackPanel>
-
-                    <!-- <StackPanel Orientation="Vertical" Spacing="2" MinWidth="160">
-                        <TextBlock Text="订阅结束" FontSize="11" Foreground="#FF9CA3AF"/>
-                        <TextBlock Text="{Binding SubEndDate}" FontSize="14" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
-                    </StackPanel> -->
 
                     <StackPanel Orientation="Vertical" Spacing="2" MinWidth="100">
                         <TextBlock Text="订阅状态" FontSize="11" Foreground="#FF9CA3AF"/>
@@ -132,7 +147,7 @@
                 </StackPanel>
 
                 <!-- 第二行：本周用量 -->
-                <StackPanel Orientation="Vertical" Spacing="2">
+                <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Vertical" Spacing="2" Margin="0,10,0,0">
                     <TextBlock Text="本周用量" FontSize="11" FontWeight="SemiBold" Foreground="#FF9CA3AF" Margin="0,0,0,2"/>
                     <StackPanel Orientation="Horizontal" Spacing="14">
                         <StackPanel Orientation="Vertical" Spacing="1" MinWidth="150">
@@ -163,7 +178,7 @@
                 </StackPanel>
 
                 <!-- 第三行：本周期用量 -->
-                <StackPanel Orientation="Vertical" Spacing="2">
+                <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Vertical" Spacing="2" Margin="0,10,0,0">
                     <TextBlock Text="本周期用量" FontSize="11" FontWeight="SemiBold" Foreground="#FF9CA3AF" Margin="0,0,0,2"/>
                     <StackPanel Orientation="Horizontal" Spacing="14">
                         <StackPanel Orientation="Vertical" Spacing="1" MinWidth="150">
@@ -192,7 +207,21 @@
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>
-            </StackPanel>
+                <!-- 大正方形刷新按钮：跨第二、三行（本周用量 + 本周期用量），垂直居中，点击立即拉取一次 -->
+                <Button Grid.Row="1" Grid.Column="1" Grid.RowSpan="2"
+                        Classes="RefreshBtn"
+                        Width="80" Height="80"
+                        Margin="20,0,0,0"
+                        VerticalAlignment="Center"
+                        Command="{Binding RefreshNowCommand}"
+                        IsEnabled="{Binding !IsSyncing}"
+                        ToolTip.Tip="立即刷新">
+                    <Path Width="40" Height="40"
+                          Stretch="Uniform"
+                          Fill="White"
+                          Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"/>
+                </Button>
+            </Grid>
         </Border>
 
         <!-- 底部状态栏：状态灯 + 状态文本（含报错） + 最近拉取时间 -->

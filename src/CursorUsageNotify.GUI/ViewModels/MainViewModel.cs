@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -519,6 +519,17 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 StatusText = $"打开浏览器失败：{ex.Message}";
                 StatusColor = "#dc3545";
             }
+        }
+
+        /// <summary>
+        /// 立即触发一次用量拉取（大屏刷新按钮）。
+        /// 通过消息总线发送 <see cref="TriggerSyncNowMessage"/>，
+        /// 由 <see cref="UsageSyncHostedService"/> 执行实际同步。
+        /// </summary>
+        [RelayCommand]
+        private void RefreshNow()
+        {
+            Messenger.Send(new TriggerSyncNowMessage());
         }
     }
 }
