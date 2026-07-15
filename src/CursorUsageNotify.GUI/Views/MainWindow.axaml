@@ -101,143 +101,279 @@
             </Grid>
         </Border>
 
-        <!-- 顶部数据大屏 -->
-        <Border DockPanel.Dock="Top" Background="#FF1F2937" Padding="24,14">
-            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+        <!-- 顶部数据大屏：双列布局，每列一个平台 -->
+        <Border DockPanel.Dock="Top" Background="#FF1F2937" Padding="16,12">
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
 
-                <!-- 第一行：用户名(含订阅类型) + 订阅起始 + 订阅结束 + 订阅状态 + 发票数 -->
-                <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="24">
-                    <StackPanel Orientation="Vertical" Spacing="2" MinWidth="120">
-                        <TextBlock Text="用户" FontSize="11" Foreground="#FF9CA3AF"/>
-                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding UserDisplayName}" FontSize="15" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="{Binding PlanName, StringFormat=（{0}）}" FontSize="12" Foreground="#FF60A5FA"/>
+                <!-- Cursor 平台列 -->
+                <Border Grid.Column="0" BorderBrush="#FF374151" BorderThickness="1" CornerRadius="8" Padding="12,10"
+                        IsVisible="{Binding CursorDashboard.IsEnabled}">
+                    <StackPanel Orientation="Vertical" Spacing="8">
+                        <!-- 平台标题 -->
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding CursorDashboard.PlatformName}" FontSize="15" FontWeight="SemiBold" Foreground="#FF60A5FA"/>
+                            <TextBlock Text="{Binding CursorDashboard.PlanName, StringFormat=（{0}）}" FontSize="11" Foreground="#FF9CA3AF"/>
                         </StackPanel>
-                        <!-- <TextBlock Text="{Binding UserEmail}" FontSize="10" Foreground="#FF9CA3AF"/> -->
-                    </StackPanel>
 
-                    <StackPanel Orientation="Vertical" Spacing="2" MinWidth="120">
-                        <TextBlock Text="订阅周期" FontSize="11" Foreground="#FF9CA3AF"/>
-                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding SubStartDate}" FontSize="13" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
-                            <TextBlock Text=" - " FontSize="13" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
-                            <TextBlock Text="{Binding SubEndDate}" FontSize="13" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
+                        <!-- 账户信息行 -->
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <StackPanel Orientation="Vertical" Spacing="1" MinWidth="100">
+                                <TextBlock Text="用户" FontSize="10" Foreground="#FF6B7280"/>
+                                <TextBlock Text="{Binding CursorDashboard.DisplayName}" FontSize="12" FontWeight="SemiBold" Foreground="#FFD1D5DB"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Vertical" Spacing="1" MinWidth="140">
+                                <TextBlock Text="邮箱" FontSize="10" Foreground="#FF6B7280"/>
+                                <TextBlock Text="{Binding CursorDashboard.Email}" FontSize="12" Foreground="#FFD1D5DB"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Vertical" Spacing="1" MinWidth="180">
+                                <TextBlock Text="订阅周期" FontSize="10" Foreground="#FF6B7280"/>
+                                <TextBlock Text="{Binding CursorDashboard.PeriodRange}" FontSize="12" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Vertical" Spacing="1" MinWidth="60">
+                                <TextBlock Text="状态" FontSize="10" Foreground="#FF6B7280"/>
+                                <TextBlock Text="{Binding CursorDashboard.SubStatus}" FontSize="12" Foreground="#FFD1D5DB"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 当天用量 -->
+                        <StackPanel Orientation="Vertical" Spacing="2">
+                            <TextBlock Text="当天用量" FontSize="10" FontWeight="SemiBold" Foreground="#FF9CA3AF"/>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="输入" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.TodayInputTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF93C5FD"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="输出" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.TodayOutputTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF86EFAC"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="缓存读" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.TodayCacheReadTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFDE047"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="缓存写" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.TodayCacheWriteTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFC4B5FD"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="90">
+                                    <TextBlock Text="总用量" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.TodayTotalTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF67E8F9"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="费用" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.TodaySpend, StringFormat={}{0:F2}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFCA5A5"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 本周用量 -->
+                        <StackPanel Orientation="Vertical" Spacing="2">
+                            <TextBlock Text="本周用量" FontSize="10" FontWeight="SemiBold" Foreground="#FF9CA3AF"/>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="输入" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.WeekInputTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF93C5FD"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="输出" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.WeekOutputTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF86EFAC"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="缓存读" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.WeekCacheReadTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFDE047"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="缓存写" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.WeekCacheWriteTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFC4B5FD"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="90">
+                                    <TextBlock Text="总用量" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.WeekTotalTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF67E8F9"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="费用" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.WeekSpend, StringFormat={}{0:F2}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFCA5A5"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 本周期用量 -->
+                        <StackPanel Orientation="Vertical" Spacing="2">
+                            <TextBlock Text="本周期用量" FontSize="10" FontWeight="SemiBold" Foreground="#FF9CA3AF"/>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="输入" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.PeriodInputTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF60A5FA"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="输出" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.PeriodOutputTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF34D399"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="缓存读" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.PeriodCacheReadTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFBBF24"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="缓存写" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.PeriodCacheWriteTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="90">
+                                    <TextBlock Text="总用量" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.PeriodTotalTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF22D3EE"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="费用" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding CursorDashboard.PeriodSpend, StringFormat={}{0:F2}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFF87171"/>
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
                     </StackPanel>
+                </Border>
 
-                    <StackPanel Orientation="Vertical" Spacing="2" MinWidth="100">
-                        <TextBlock Text="订阅状态" FontSize="11" Foreground="#FF9CA3AF"/>
-                        <TextBlock Text="{Binding SubStatus}" FontSize="14" FontWeight="SemiBold" Foreground="#FFD1D5DB"/>
+                <!-- DeepSeek 平台列 -->
+                <Border Grid.Column="1" BorderBrush="#FF374151" BorderThickness="1" CornerRadius="8" Padding="12,10"
+                        IsVisible="{Binding DeepSeekDashboard.IsEnabled}">
+                    <StackPanel Orientation="Vertical" Spacing="8">
+                        <!-- 平台标题 -->
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding DeepSeekDashboard.PlatformName}" FontSize="15" FontWeight="SemiBold" Foreground="#FF34D399"/>
+                            <TextBlock Text="{Binding DeepSeekDashboard.PlanName, StringFormat=（{0}）}" FontSize="11" Foreground="#FF9CA3AF"/>
+                        </StackPanel>
+
+                        <!-- 账户信息行（无订阅周期/状态，DeepSeek 按自然月） -->
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <StackPanel Orientation="Vertical" Spacing="1" MinWidth="100">
+                                <TextBlock Text="用户" FontSize="10" Foreground="#FF6B7280"/>
+                                <TextBlock Text="{Binding DeepSeekDashboard.DisplayName}" FontSize="12" FontWeight="SemiBold" Foreground="#FFD1D5DB"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Vertical" Spacing="1" MinWidth="180">
+                                <TextBlock Text="本月周期" FontSize="10" Foreground="#FF6B7280"/>
+                                <TextBlock Text="{Binding DeepSeekDashboard.PeriodRange}" FontSize="12" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 当天用量（无缓存写入） -->
+                        <StackPanel Orientation="Vertical" Spacing="2">
+                            <TextBlock Text="当天用量" FontSize="10" FontWeight="SemiBold" Foreground="#FF9CA3AF"/>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="输入" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.TodayInputTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF93C5FD"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="输出" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.TodayOutputTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF86EFAC"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="缓存读" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.TodayCacheReadTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFDE047"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="90">
+                                    <TextBlock Text="总用量" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.TodayTotalTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF67E8F9"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="费用(¥)" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.TodaySpend, StringFormat={}{0:F2}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFCA5A5"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 本周用量 -->
+                        <StackPanel Orientation="Vertical" Spacing="2">
+                            <TextBlock Text="本周用量" FontSize="10" FontWeight="SemiBold" Foreground="#FF9CA3AF"/>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="输入" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.WeekInputTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF93C5FD"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="输出" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.WeekOutputTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF86EFAC"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="缓存读" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.WeekCacheReadTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFDE047"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="90">
+                                    <TextBlock Text="总用量" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.WeekTotalTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF67E8F9"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="费用(¥)" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.WeekSpend, StringFormat={}{0:F2}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFCA5A5"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 本月用量 -->
+                        <StackPanel Orientation="Vertical" Spacing="2">
+                            <TextBlock Text="本月用量" FontSize="10" FontWeight="SemiBold" Foreground="#FF9CA3AF"/>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="输入" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.PeriodInputTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF60A5FA"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="输出" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.PeriodOutputTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF34D399"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="缓存读" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.PeriodCacheReadTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFBBF24"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="90">
+                                    <TextBlock Text="总用量" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.PeriodTotalTokens, Converter={StaticResource TokenFormat}}" FontSize="13" FontWeight="SemiBold" Foreground="#FF22D3EE"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Vertical" Spacing="1" MinWidth="80">
+                                    <TextBlock Text="费用(¥)" FontSize="9" Foreground="#FF6B7280"/>
+                                    <TextBlock Text="{Binding DeepSeekDashboard.PeriodSpend, StringFormat={}{0:F2}}" FontSize="13" FontWeight="SemiBold" Foreground="#FFF87171"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
                     </StackPanel>
+                </Border>
 
-                    <StackPanel Orientation="Vertical" Spacing="2" MinWidth="80">
-                        <TextBlock Text="发票数" FontSize="11" Foreground="#FF9CA3AF"/>
-                        <TextBlock Text="{Binding InvoiceCount}" FontSize="14" FontWeight="SemiBold" Foreground="#FFD1D5DB"/>
-                    </StackPanel>
+            </Grid>
+        </Border>
 
-                    <!-- Token 格式切换按钮 -->
+        <!-- 底部状态栏：刷新 + 切换单位按钮 + 状态灯（hover 显示各平台同步状态）+ 状态文本 -->
+        <Border DockPanel.Dock="Bottom" Background="#FFF3F4F6" BorderBrush="#FFE5E7EB" BorderThickness="0,1,0,0" Padding="12,6">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <!-- 左：操作按钮 + 状态灯 + 状态文本 -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <!-- 立即刷新按钮 -->
+                    <Button Classes="RefreshBtn"
+                            Width="32" Height="32"
+                            Padding="0"
+                            Command="{Binding RefreshNowCommand}"
+                            IsEnabled="{Binding !IsSyncing}"
+                            ToolTip.Tip="立即刷新所有启用平台">
+                        <Path Width="18" Height="18"
+                              Stretch="Uniform"
+                              Fill="White"
+                              Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"/>
+                    </Button>
+
+                    <!-- 切换单位按钮 -->
                     <Button Classes="TokenFormatBtn"
                             Command="{Binding CycleTokenFormatCommand}"
                             Content="{Binding TokenFormatLabel}"
                             ToolTip.Tip="切换 Token 显示格式：全部 / 万 / 百万"
                             Padding="10,4"
                             FontSize="12"
-                            Margin="8,0,0,0"
                             VerticalAlignment="Center"/>
-                </StackPanel>
 
-                <!-- 第二行：本周用量 -->
-                <StackPanel Grid.Row="1" Grid.Column="0" Orientation="Vertical" Spacing="2" Margin="0,10,0,0">
-                    <TextBlock Text="本周用量" FontSize="11" FontWeight="SemiBold" Foreground="#FF9CA3AF" Margin="0,0,0,2"/>
-                    <StackPanel Orientation="Horizontal" Spacing="14">
-                        <StackPanel Orientation="Vertical" Spacing="1" MinWidth="150">
-                            <TextBlock Text="输入 Token" FontSize="10" Foreground="#FF6B7280"/>
-                            <TextBlock Text="{Binding WeekInputTokens, Converter={StaticResource TokenFormat}}" FontSize="16" FontWeight="SemiBold" Foreground="#FF93C5FD"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Vertical" Spacing="1" MinWidth="150">
-                            <TextBlock Text="输出 Token" FontSize="10" Foreground="#FF6B7280"/>
-                            <TextBlock Text="{Binding WeekOutputTokens, Converter={StaticResource TokenFormat}}" FontSize="16" FontWeight="SemiBold" Foreground="#FF86EFAC"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Vertical" Spacing="1" MinWidth="150">
-                            <TextBlock Text="缓存读取" FontSize="10" Foreground="#FF6B7280"/>
-                            <TextBlock Text="{Binding WeekCacheReadTokens, Converter={StaticResource TokenFormat}}" FontSize="16" FontWeight="SemiBold" Foreground="#FFFDE047"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Vertical" Spacing="1" MinWidth="150">
-                            <TextBlock Text="缓存写入" FontSize="10" Foreground="#FF6B7280"/>
-                            <TextBlock Text="{Binding WeekCacheWriteTokens, Converter={StaticResource TokenFormat}}" FontSize="16" FontWeight="SemiBold" Foreground="#FFC4B5FD"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Vertical" Spacing="1" MinWidth="160">
-                            <TextBlock Text="总用量" FontSize="10" Foreground="#FF6B7280"/>
-                            <TextBlock Text="{Binding WeekTotalTokens, Converter={StaticResource TokenFormat}}" FontSize="16" FontWeight="SemiBold" Foreground="#FF67E8F9"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Vertical" Spacing="1" MinWidth="140">
-                            <TextBlock Text="费用" FontSize="10" Foreground="#FF6B7280"/>
-                            <TextBlock Text="{Binding WeekSpendDollars, StringFormat=\${0:F2}}" FontSize="16" FontWeight="SemiBold" Foreground="#FFFCA5A5"/>
-                        </StackPanel>
-                    </StackPanel>
-                </StackPanel>
-
-                <!-- 第三行：本周期用量 -->
-                <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Vertical" Spacing="2" Margin="0,10,0,0">
-                    <TextBlock Text="本周期用量" FontSize="11" FontWeight="SemiBold" Foreground="#FF9CA3AF" Margin="0,0,0,2"/>
-                    <StackPanel Orientation="Horizontal" Spacing="14">
-                        <StackPanel Orientation="Vertical" Spacing="1" MinWidth="150">
-                            <TextBlock Text="输入 Token" FontSize="10" Foreground="#FF6B7280"/>
-                            <TextBlock Text="{Binding PeriodInputTokens, Converter={StaticResource TokenFormat}}" FontSize="16" FontWeight="SemiBold" Foreground="#FF60A5FA"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Vertical" Spacing="1" MinWidth="150">
-                            <TextBlock Text="输出 Token" FontSize="10" Foreground="#FF6B7280"/>
-                            <TextBlock Text="{Binding PeriodOutputTokens, Converter={StaticResource TokenFormat}}" FontSize="16" FontWeight="SemiBold" Foreground="#FF34D399"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Vertical" Spacing="1" MinWidth="150">
-                            <TextBlock Text="缓存读取" FontSize="10" Foreground="#FF6B7280"/>
-                            <TextBlock Text="{Binding PeriodCacheReadTokens, Converter={StaticResource TokenFormat}}" FontSize="16" FontWeight="SemiBold" Foreground="#FFFBBF24"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Vertical" Spacing="1" MinWidth="150">
-                            <TextBlock Text="缓存写入" FontSize="10" Foreground="#FF6B7280"/>
-                            <TextBlock Text="{Binding PeriodCacheWriteTokens, Converter={StaticResource TokenFormat}}" FontSize="16" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Vertical" Spacing="1" MinWidth="160">
-                            <TextBlock Text="总用量" FontSize="10" Foreground="#FF6B7280"/>
-                            <TextBlock Text="{Binding PeriodTotalTokens, Converter={StaticResource TokenFormat}}" FontSize="16" FontWeight="SemiBold" Foreground="#FF22D3EE"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Vertical" Spacing="1" MinWidth="140">
-                            <TextBlock Text="费用" FontSize="10" Foreground="#FF6B7280"/>
-                            <TextBlock Text="{Binding PeriodSpendDollars, StringFormat=\${0:F2}}" FontSize="16" FontWeight="SemiBold" Foreground="#FFF87171"/>
-                        </StackPanel>
-                    </StackPanel>
-                </StackPanel>
-                <!-- 大正方形刷新按钮：跨第二、三行（本周用量 + 本周期用量），垂直居中，点击立即拉取一次 -->
-                <Button Grid.Row="1" Grid.Column="1" Grid.RowSpan="2"
-                        Classes="RefreshBtn"
-                        Width="80" Height="80"
-                        Margin="20,0,0,0"
-                        VerticalAlignment="Center"
-                        Command="{Binding RefreshNowCommand}"
-                        IsEnabled="{Binding !IsSyncing}"
-                        ToolTip.Tip="立即刷新">
-                    <Path Width="40" Height="40"
-                          Stretch="Uniform"
-                          Fill="White"
-                          Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"/>
-                </Button>
-            </Grid>
-        </Border>
-
-        <!-- 底部状态栏：状态灯 + 状态文本（含报错） + 最近拉取时间 -->
-        <Border DockPanel.Dock="Bottom" Background="#FFF3F4F6" BorderBrush="#FFE5E7EB" BorderThickness="0,1,0,0" Padding="12,6">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-                <!-- 左：状态灯 + 状态文本（报错时显示错误信息） -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <Ellipse Width="8" Height="8" Fill="{Binding StatusColor}"/>
+                    <!-- 状态灯（带 tooltip 显示各平台同步状态和时间） -->
+                    <Ellipse Width="10" Height="10" Fill="{Binding StatusColor}"
+                             ToolTip.Tip="{Binding StatusTooltip}"
+                             VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#FF1F2937" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- 右：最近拉取时间 -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <TextBlock Text="最近拉取：" FontSize="12" Foreground="#FF6B7280" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding LastFetchTime}" FontSize="12" Foreground="#FF1F2937" VerticalAlignment="Center"/>
-                </StackPanel>
+                <!-- 右：留空（原同步时间已移除，移到状态灯 tooltip） -->
+                <TextBlock Grid.Column="2" Text="" FontSize="12"/>
             </Grid>
         </Border>
 

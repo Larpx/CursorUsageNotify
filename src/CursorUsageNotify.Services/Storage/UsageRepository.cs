@@ -239,5 +239,15 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
 
             return await AggregateStatsAsync(weekStart, weekEnd, platform, ct);
         }
+
+        /// <inheritdoc/>
+        public async Task<UsageAggregateStats> AggregateDailyStatsAsync(PlatformType platform = PlatformType.Cursor, CancellationToken ct = default)
+        {
+            var today = DateTime.Now.Date;
+            var dayStart = new DateTimeOffset(today, TimeZoneInfo.Local.GetUtcOffset(today)).ToUnixTimeMilliseconds();
+            var dayEnd = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            return await AggregateStatsAsync(dayStart, dayEnd, platform, ct);
+        }
     }
 }

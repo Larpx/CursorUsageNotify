@@ -17,8 +17,8 @@ using Larpx.PersonalTools.CursorUsageNotify.Services.Storage;
 namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
 {
     /// <summary>
-    /// 数据大屏 ViewModel：展示用户信息、订阅、用量、总 token 数等统计数据。
-    /// 订阅 <see cref="UsageDataFetchedMessage"/> 自动刷新。
+    /// 数据大屏 ViewModel：双列展示多平台用量数据，订阅同步事件自动刷新。
+    /// 每个平台对应一个 <see cref="PlatformDashboardItem"/>，按 <see cref="UserPreferences"/> 启用状态控制可见性。
     /// </summary>
     public sealed partial class MainViewModel : ViewModelBase
     {
@@ -27,8 +27,8 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         private readonly UserPreferences _userPrefs;
 
         /// <summary>
-        /// 构造数据大屏 ViewModel，注入仓储与消息总线，
-        /// 订阅同步事件并在初始化时拉取一次最新数据。
+        /// 构造数据大屏 ViewModel，注入仓储、同步选项与用户偏好，
+        /// 初始化各平台 Dashboard 并订阅同步事件。
         /// </summary>
         /// <param name="repository">
         /// 用量数据仓储。
@@ -55,14 +55,44 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             _syncOptions.TokenDisplayMode = userPrefs.TokenDisplayMode;
             TokenFormatConverter.Mode = userPrefs.TokenDisplayMode;
 
+            // 初始化各平台 Dashboard（后续可扩展更多平台）
+            CursorDashboard = new PlatformDashboardItem
+            {
+                Platform = PlatformType.Cursor,
+                PlatformName = "Cursor",
+                HasCacheWrite = true,
+                HasSubscription = true,
+                CurrencySymbol = "$",
+                IsEnabled = userPrefs.IsPlatformEnabled(PlatformType.Cursor)
+            };
+            DeepSeekDashboard = new PlatformDashboardItem
+            {
+                Platform = PlatformType.DeepSeek,
+                PlatformName = "DeepSeek",
+                HasCacheWrite = false,
+                HasSubscription = false,
+                CurrencySymbol = "¥",
+                IsEnabled = userPrefs.IsPlatformEnabled(PlatformType.DeepSeek)
+            };
+
             Messenger.Register<UsageDataFetchedMessage>(this, OnDataFetched);
             Messenger.Register<SyncFailedMessage>(this, OnSyncFailed);
             Messenger.Register<SyncStartedMessage>(this, OnSyncStarted);
             Messenger.Register<CookieExpiringSoonMessage>(this, OnCookieExpiring);
             Messenger.Register<EndpointDegradedMessage>(this, OnEndpointDegraded);
             Messenger.Register<TokenStorageUnavailableMessage>(this, OnTokenStorageUnavailable);
-            _ = LoadAsync();
+            _ = LoadAllAsync();
         }
+
+        /// <summary>
+        /// Cursor 平台大屏数据项。
+        /// </summary>
+        public PlatformDashboardItem CursorDashboard { get; }
+
+        /// <summary>
+        /// DeepSeek 平台大屏数据项。
+        /// </summary>
+        public PlatformDashboardItem DeepSeekDashboard { get; }
 
         /// <summary>
         /// 根据 Token 显示格式返回对应的按钮标签文本。
@@ -78,124 +108,6 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 _ => "当前Token显示格式：全部"
             };
         }
-
-        /// <summary>
-        /// 用户邮箱（来自登录账号）。
-        /// </summary>
-        [ObservableProperty]
-        private string _userEmail = "未获取";
-
-        /// <summary>
-        /// 用户显示名（优先 Name，其次 Email）。
-        /// </summary>
-        [ObservableProperty]
-        private string _userDisplayName = "未获取";
-
-        /// <summary>
-        /// 订阅计划名称（如 pro、free）。
-        /// </summary>
-        [ObservableProperty]
-        private string _planName = "未获取";
-
-        /// <summary>
-        /// 当前订阅周期范围文本。
-        /// </summary>
-        [ObservableProperty]
-        private string _periodRange = "-";
-
-        // ---- 本订阅周期用量统计 ----
-
-        /// <summary>
-        /// 本订阅周期输入 token 总数。
-        /// </summary>
-        [ObservableProperty]
-        private long _periodInputTokens;
-
-        /// <summary>
-        /// 本订阅周期输出 token 总数。
-        /// </summary>
-        [ObservableProperty]
-        private long _periodOutputTokens;
-
-        /// <summary>
-        /// 本订阅周期缓存读取 token 总数。
-        /// </summary>
-        [ObservableProperty]
-        private long _periodCacheReadTokens;
-
-        /// <summary>
-        /// 本订阅周期缓存写入 token 总数。
-        /// </summary>
-        [ObservableProperty]
-        private long _periodCacheWriteTokens;
-
-        /// <summary>
-        /// 本订阅周期总支出（美元）。
-        /// </summary>
-        [ObservableProperty]
-        private decimal _periodSpendDollars;
-
-        /// <summary>
-        /// 本订阅周期总 token 用量（输入+输出+缓存读+缓存写）。
-        /// </summary>
-        [ObservableProperty]
-        private long _periodTotalTokens;
-
-        // ---- 本周用量统计 ----
-
-        /// <summary>
-        /// 本周输入 token 总数。
-        /// </summary>
-        [ObservableProperty]
-        private long _weekInputTokens;
-
-        /// <summary>
-        /// 本周输出 token 总数。
-        /// </summary>
-        [ObservableProperty]
-        private long _weekOutputTokens;
-
-        /// <summary>
-        /// 本周缓存读取 token 总数。
-        /// </summary>
-        [ObservableProperty]
-        private long _weekCacheReadTokens;
-
-        /// <summary>
-        /// 本周缓存写入 token 总数。
-        /// </summary>
-        [ObservableProperty]
-        private long _weekCacheWriteTokens;
-
-        /// <summary>
-        /// 本周总支出（美元）。
-        /// </summary>
-        [ObservableProperty]
-        private decimal _weekSpendDollars;
-
-        /// <summary>
-        /// 本周总 token 用量（输入+输出+缓存读+缓存写）。
-        /// </summary>
-        [ObservableProperty]
-        private long _weekTotalTokens;
-
-        /// <summary>
-        /// 最近一次成功拉取数据的时间文本。
-        /// </summary>
-        [ObservableProperty]
-        private string _lastFetchTime = "-";
-
-        /// <summary>
-        /// 状态指示颜色（灰=未启动，黄=同步中，绿=已同步，红=失败）。
-        /// </summary>
-        [ObservableProperty]
-        private string _statusColor = "#888888"; // 灰=未启动
-
-        /// <summary>
-        /// 状态文本（如：等待中、同步中、已同步、失败）。
-        /// </summary>
-        [ObservableProperty]
-        private string _statusText = "等待中";
 
         /// <summary>
         /// 是否正在同步（控制顶部进度条显示，避免误以为卡顿）。
@@ -232,52 +144,50 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         /// </summary>
         public bool HasCookieWarning => !string.IsNullOrEmpty(CookieStatusText);
 
+        /// <summary>
+        /// 全局状态灯颜色（取所有启用平台最差状态：红>黄>绿>灰）。
+        /// </summary>
+        [ObservableProperty]
+        private string _statusColor = "#888888";
+
+        /// <summary>
+        /// 全局状态文本（底部状态栏显示）。
+        /// </summary>
+        [ObservableProperty]
+        private string _statusText = "等待中";
+
+        /// <summary>
+        /// 状态灯 tooltip 文本：列出所有启用平台的同步状态和时间。
+        /// </summary>
+        [ObservableProperty]
+        private string _statusTooltip = string.Empty;
+
         partial void OnCookieStatusTextChanged(string value)
         {
             OnPropertyChanged(nameof(HasCookieWarning));
         }
 
-        // 订阅信息
-
-        /// <summary>
-        /// 订阅开始日期文本。
-        /// </summary>
-        [ObservableProperty]
-        private string _subStartDate = "-";
-
-        /// <summary>
-        /// 当前订阅周期结束日期（或下次续费/取消日期）。
-        /// </summary>
-        [ObservableProperty]
-        private string _subEndDate = "-";
-
-        /// <summary>
-        /// 订阅状态文本（活跃、试用中、已取消、逾期）。
-        /// </summary>
-        [ObservableProperty]
-        private string _subStatus = "-";
-
-        /// <summary>
-        /// 账单数量文本。
-        /// </summary>
-        [ObservableProperty]
-        private string _invoiceCount = "-";
-
         private void OnDataFetched(object recipient, UsageDataFetchedMessage msg)
         {
             IsSyncing = false;
-            _ = LoadAsync(msg);
+            _ = LoadPlatformAsync(msg);
         }
 
         private void OnSyncFailed(object recipient, SyncFailedMessage msg)
         {
             IsSyncing = false;
-            StatusColor = "#dc3545"; // 红
-            StatusText = $"失败：{msg.Error}";
+            var dashboard = GetDashboard(msg.Platform);
+            if (dashboard is not null)
+            {
+                dashboard.IsSyncing = false;
+                dashboard.StatusColor = "#dc3545"; // 红
+                dashboard.StatusText = $"失败：{msg.Error}";
+            }
+            UpdateGlobalStatus();
             // 认证类失败（401/403）视为 cookie 失效
             if (msg.Error.Contains("401") || msg.Error.Contains("403") || msg.Error.Contains("认证"))
             {
-                CookieStatusText = "Cookie 已失效，请在设置中更新";
+                CookieStatusText = $"{msg.Platform} 凭证已失效，请在设置中更新";
                 CookieStatusColor = "#dc3545";
             }
         }
@@ -285,21 +195,29 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         private void OnSyncStarted(object recipient, SyncStartedMessage msg)
         {
             IsSyncing = true;
-            StatusColor = "#f59e0b"; // 黄=同步中
+            // SyncStartedMessage 不带 Platform，所有启用的平台都进入同步中状态
+            foreach (var dashboard in GetEnabledDashboards())
+            {
+                dashboard.IsSyncing = true;
+                dashboard.StatusColor = "#f59e0b"; // 黄=同步中
+                dashboard.StatusText = "同步中...";
+            }
+            StatusColor = "#f59e0b";
             StatusText = "同步中...";
+            UpdateStatusTooltip();
         }
 
         private void OnCookieExpiring(object recipient, CookieExpiringSoonMessage msg)
         {
             if (msg.IsExpired)
             {
-                CookieStatusText = "Cookie 已失效，请在设置中更新";
+                CookieStatusText = $"{msg.Platform} 凭证已失效，请在设置中更新";
                 CookieStatusColor = "#dc3545";
             }
             else
             {
                 var days = Math.Max(0, (int)(msg.ExpiryUtc - DateTime.UtcNow).TotalDays);
-                CookieStatusText = $"Cookie 将在 {days} 天后过期（{msg.ExpiryUtc:yyyy-MM-dd}）";
+                CookieStatusText = $"{msg.Platform} 凭证将在 {days} 天后过期（{msg.ExpiryUtc:yyyy-MM-dd}）";
                 CookieStatusColor = "#f59e0b";
             }
         }
@@ -310,7 +228,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         private void OnEndpointDegraded(object recipient, EndpointDegradedMessage msg)
         {
             StatusColor = "#dc3545";
-            StatusText = $"Cursor 接口已变更：{string.Join("、", msg.DegradedPaths)}，请检查客户端更新";
+            StatusText = $"接口已变更：{string.Join("、", msg.DegradedPaths)}，请检查客户端更新";
         }
 
         /// <summary>
@@ -323,28 +241,67 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         }
 
         /// <summary>
-        /// 从数据库加载最新数据刷新大屏。
+        /// 根据平台类型获取对应的 Dashboard 项。
         /// </summary>
-        public async Task LoadAsync(UsageDataFetchedMessage? msg = null)
+        /// <param name="platform">平台类型。</param>
+        /// <returns>对应 Dashboard；未注册平台返回 null。</returns>
+        private PlatformDashboardItem? GetDashboard(PlatformType platform) => platform switch
         {
-            var period = msg?.LatestPeriod ?? await _repository.GetLatestPeriodUsageAsync();
-            var user = msg?.LatestUser ?? await _repository.GetLatestUserInfoAsync();
-            var sub = msg?.LatestSubscription ?? await _repository.GetLatestSubscriptionAsync();
+            PlatformType.Cursor => CursorDashboard,
+            PlatformType.DeepSeek => DeepSeekDashboard,
+            _ => null
+        };
+
+        /// <summary>
+        /// 获取所有已启用的 Dashboard 项。
+        /// </summary>
+        private IEnumerable<PlatformDashboardItem> GetEnabledDashboards()
+        {
+            if (CursorDashboard.IsEnabled) yield return CursorDashboard;
+            if (DeepSeekDashboard.IsEnabled) yield return DeepSeekDashboard;
+        }
+
+        /// <summary>
+        /// 加载所有启用平台的数据刷新大屏（启动时调用）。
+        /// </summary>
+        private async Task LoadAllAsync()
+        {
+            await LoadPlatformAsync(null, PlatformType.Cursor);
+            await LoadPlatformAsync(null, PlatformType.DeepSeek);
+            UpdateGlobalStatus();
+        }
+
+        /// <summary>
+        /// 从数据库加载指定平台最新数据刷新对应 Dashboard。
+        /// </summary>
+        /// <param name="msg">同步消息（含已拉取的最新数据）；null 时从仓储查询。</param>
+        /// <param name="forcePlatform">强制加载的平台（msg 为 null 时使用）。</param>
+        private async Task LoadPlatformAsync(UsageDataFetchedMessage? msg = null, PlatformType? forcePlatform = null)
+        {
+            var platform = msg?.Platform ?? forcePlatform ?? PlatformType.Cursor;
+            var dashboard = GetDashboard(platform);
+            if (dashboard is null) return;
+
+            // 同步可见性与启用开关
+            dashboard.IsEnabled = _userPrefs.IsPlatformEnabled(platform);
+
+            var period = msg?.LatestPeriod ?? await _repository.GetLatestPeriodUsageAsync(platform);
+            var user = msg?.LatestUser ?? await _repository.GetLatestUserInfoAsync(platform);
+            var sub = msg?.LatestSubscription ?? await _repository.GetLatestSubscriptionAsync(platform);
             var agg = msg?.AggregateStats;
 
             // 如果消息中没有聚合数据，尝试按当前周期自行查询
-            // 优先 subscription 周期，其次 period 周期（sub 可能为空，period 仍可用）
             if (agg is null)
             {
                 var aggStart = sub?.CurrentPeriodStart ?? period?.PeriodStart ?? 0;
                 var aggEnd = sub?.CurrentPeriodEnd ?? period?.PeriodEnd ?? 0;
                 if (aggStart > 0 && aggEnd > 0)
                 {
-                    agg = await _repository.AggregateStatsAsync(aggStart, aggEnd);
+                    agg = await _repository.AggregateStatsAsync(aggStart, aggEnd, platform);
                 }
             }
 
-            // 用户信息：优先 user_info 表，其次事件表聚合，再其次 subscription
+            // 账户信息
             string? resolvedEmail = null;
             string? resolvedName = null;
             string? resolvedPlan = null;
@@ -354,74 +311,77 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 resolvedName = user.Name;
                 resolvedPlan = user.PlanName;
             }
-
             resolvedEmail ??= agg?.UserEmail ?? sub?.Email;
             resolvedPlan ??= sub?.Plan ?? period?.PlanName;
 
-            UserEmail = string.IsNullOrEmpty(resolvedEmail) ? "未知" : resolvedEmail;
-            UserDisplayName = !string.IsNullOrEmpty(resolvedName) ? resolvedName
+            dashboard.Email = string.IsNullOrEmpty(resolvedEmail) ? "-" : resolvedEmail;
+            dashboard.DisplayName = !string.IsNullOrEmpty(resolvedName) ? resolvedName
                               : !string.IsNullOrEmpty(resolvedEmail) ? resolvedEmail
-                              : "未知";
-            PlanName = resolvedPlan ?? "未知";
+                              : "-";
+            dashboard.PlanName = resolvedPlan ?? "-";
 
-            // 订阅周期：优先 subscription 实体，其次 period entity
+            // 周期范围
             var periodStart = sub?.CurrentPeriodStart ?? period?.PeriodStart ?? 0;
             var periodEnd = sub?.CurrentPeriodEnd ?? period?.PeriodEnd ?? 0;
-
             if (periodStart > 0 && periodEnd > 0)
             {
                 var start = DateTimeOffset.FromUnixTimeMilliseconds(periodStart).LocalDateTime;
                 var end = DateTimeOffset.FromUnixTimeMilliseconds(periodEnd).LocalDateTime;
-                PeriodRange = $"{start:yyyy-MM-dd} ~ {end:yyyy-MM-dd}";
+                dashboard.PeriodRange = $"{start:yyyy-MM-dd} ~ {end:yyyy-MM-dd}";
             }
 
-            // 用量统计：优先 events 表聚合数据，其次 API 快照
+            // 本周期用量（Cursor=订阅周期，DeepSeek=本月）
             if (agg is not null)
             {
-                PeriodInputTokens = agg.TotalInputTokens;
-                PeriodOutputTokens = agg.TotalOutputTokens;
-                PeriodCacheReadTokens = agg.TotalCacheReadTokens;
-                PeriodCacheWriteTokens = agg.TotalCacheWriteTokens;
-                PeriodSpendDollars = agg.TotalSpendCents / 100m;
-                PeriodTotalTokens = agg.TotalInputTokens + agg.TotalOutputTokens
+                dashboard.PeriodInputTokens = agg.TotalInputTokens;
+                dashboard.PeriodOutputTokens = agg.TotalOutputTokens;
+                dashboard.PeriodCacheReadTokens = agg.TotalCacheReadTokens;
+                dashboard.PeriodCacheWriteTokens = agg.TotalCacheWriteTokens;
+                dashboard.PeriodSpend = agg.TotalSpendCents / 100m;
+                dashboard.PeriodTotalTokens = agg.TotalInputTokens + agg.TotalOutputTokens
                                     + agg.TotalCacheReadTokens + agg.TotalCacheWriteTokens;
             }
             else if (period is not null)
             {
-                PeriodInputTokens = period.UsedTokens;
-                PeriodSpendDollars = period.TotalSpendCents / 100m;
-                PeriodTotalTokens = period.UsedTokens;
+                dashboard.PeriodInputTokens = period.UsedTokens;
+                dashboard.PeriodSpend = period.TotalSpendCents / 100m;
+                dashboard.PeriodTotalTokens = period.UsedTokens;
             }
 
-            // 本周统计
+            // 本周用量
             var weekly = msg?.WeeklyAggregateStats;
+            if (weekly is null)
+            {
+                weekly = await _repository.AggregateWeeklyStatsAsync(platform);
+            }
             if (weekly is not null)
             {
-                WeekInputTokens = weekly.TotalInputTokens;
-                WeekOutputTokens = weekly.TotalOutputTokens;
-                WeekCacheReadTokens = weekly.TotalCacheReadTokens;
-                WeekCacheWriteTokens = weekly.TotalCacheWriteTokens;
-                WeekSpendDollars = weekly.TotalSpendCents / 100m;
-                WeekTotalTokens = weekly.TotalInputTokens + weekly.TotalOutputTokens
+                dashboard.WeekInputTokens = weekly.TotalInputTokens;
+                dashboard.WeekOutputTokens = weekly.TotalOutputTokens;
+                dashboard.WeekCacheReadTokens = weekly.TotalCacheReadTokens;
+                dashboard.WeekCacheWriteTokens = weekly.TotalCacheWriteTokens;
+                dashboard.WeekSpend = weekly.TotalSpendCents / 100m;
+                dashboard.WeekTotalTokens = weekly.TotalInputTokens + weekly.TotalOutputTokens
                                   + weekly.TotalCacheReadTokens + weekly.TotalCacheWriteTokens;
             }
 
-            // 订阅信息（从 billing 页面获取）
-            if (sub is not null)
+            // 当天用量（始终从仓储查询，消息不带当天统计）
+            var daily = await _repository.AggregateDailyStatsAsync(platform);
+            if (daily is not null)
             {
-                if (sub.SubscriptionStart > 0)
-                {
-                    var subStart = DateTimeOffset.FromUnixTimeMilliseconds(sub.SubscriptionStart).LocalDateTime;
-                    SubStartDate = $"{subStart:yyyy-MM-dd}";
-                }
-                if (sub.CurrentPeriodEnd > 0)
-                {
-                    var subEnd = DateTimeOffset.FromUnixTimeMilliseconds(sub.CurrentPeriodEnd).LocalDateTime;
-                    SubEndDate = sub.CancelAtPeriodEnd
-                        ? $"{subEnd:yyyy-MM-dd}[到期取消]"
-                        : $"{subEnd:yyyy-MM-dd}[自动续费]";
-                }
-                SubStatus = sub.Status switch
+                dashboard.TodayInputTokens = daily.TotalInputTokens;
+                dashboard.TodayOutputTokens = daily.TotalOutputTokens;
+                dashboard.TodayCacheReadTokens = daily.TotalCacheReadTokens;
+                dashboard.TodayCacheWriteTokens = daily.TotalCacheWriteTokens;
+                dashboard.TodaySpend = daily.TotalSpendCents / 100m;
+                dashboard.TodayTotalTokens = daily.TotalInputTokens + daily.TotalOutputTokens
+                                  + daily.TotalCacheReadTokens + daily.TotalCacheWriteTokens;
+            }
+
+            // 订阅状态（仅 Cursor 有意义）
+            if (sub is not null && dashboard.HasSubscription)
+            {
+                dashboard.SubStatus = sub.Status switch
                 {
                     "active" => "活跃",
                     "trialing" => "试用中",
@@ -430,22 +390,77 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                     null => "-",
                     var s => s
                 };
-                InvoiceCount = sub.InvoiceCount > 0 ? $"{sub.InvoiceCount} 张" : "-";
             }
 
+            // 同步成功：更新状态灯
             if (msg is not null)
             {
-                LastFetchTime = DateTimeOffset.FromUnixTimeMilliseconds(msg.FetchTimestampMs)
+                dashboard.LastSyncTime = DateTimeOffset.FromUnixTimeMilliseconds(msg.FetchTimestampMs)
                     .LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss");
-                StatusColor = "#28a745"; // 绿
-                StatusText = "已同步";
+                dashboard.IsSyncing = false;
+                dashboard.StatusColor = "#28a745"; // 绿
+                dashboard.StatusText = "已同步";
             }
+
+            UpdateGlobalStatus();
+        }
+
+        /// <summary>
+        /// 汇总所有启用平台状态到全局状态灯与 tooltip。
+        /// 取最差状态作为全局颜色：红 > 黄 > 绿 > 灰。
+        /// </summary>
+        private void UpdateGlobalStatus()
+        {
+            var dashboards = GetEnabledDashboards().ToList();
+            if (dashboards.Count == 0)
+            {
+                StatusColor = "#888888";
+                StatusText = "无启用平台";
+                UpdateStatusTooltip();
+                return;
+            }
+
+            // 优先级：红 > 黄 > 绿 > 灰
+            var worst = dashboards
+                .Select(d => d.StatusColor switch
+                {
+                    "#dc3545" => 3, // 红
+                    "#f59e0b" => 2, // 黄
+                    "#28a745" => 1, // 绿
+                    _ => 0          // 灰
+                })
+                .Max();
+            StatusColor = worst switch
+            {
+                3 => "#dc3545",
+                2 => "#f59e0b",
+                1 => "#28a745",
+                _ => "#888888"
+            };
+            StatusText = worst switch
+            {
+                3 => "存在失败平台",
+                2 => "同步中",
+                1 => "已同步",
+                _ => "等待中"
+            };
+            UpdateStatusTooltip();
+        }
+
+        /// <summary>
+        /// 更新状态灯 tooltip：列出所有启用平台的同步状态和时间。
+        /// </summary>
+        private void UpdateStatusTooltip()
+        {
+            var lines = GetEnabledDashboards()
+                .Select(d => $"{d.PlatformName}: {d.StatusText}（{d.LastSyncTime}）");
+            StatusTooltip = string.Join("\n", lines);
         }
 
         /// <summary>
         /// 循环切换 Token 全局显示格式：全部 → 万 → 百万 → 全部。
         /// 同步更新共享状态（UsageSyncOptions + TokenFormatConverter.Mode），
-        /// 重抛 10 个 token 属性触发大屏重渲染，并广播消息让 QueryViewModel 刷新 DataGrid。
+        /// 重抛所有平台所有 token 属性触发大屏重渲染，并广播消息让 QueryViewModel 刷新 DataGrid。
         /// </summary>
         [RelayCommand]
         private void CycleTokenFormat()
@@ -474,24 +489,18 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 Debug.WriteLine($"保存用户偏好失败：{ex.Message}");
             }
 
-            // 重抛 10 个 token 属性，触发大屏 Binding 重新求值
-            OnPropertyChanged(nameof(WeekInputTokens));
-            OnPropertyChanged(nameof(WeekOutputTokens));
-            OnPropertyChanged(nameof(WeekCacheReadTokens));
-            OnPropertyChanged(nameof(WeekCacheWriteTokens));
-            OnPropertyChanged(nameof(WeekTotalTokens));
-            OnPropertyChanged(nameof(PeriodInputTokens));
-            OnPropertyChanged(nameof(PeriodOutputTokens));
-            OnPropertyChanged(nameof(PeriodCacheReadTokens));
-            OnPropertyChanged(nameof(PeriodCacheWriteTokens));
-            OnPropertyChanged(nameof(PeriodTotalTokens));
+            // 重抛所有平台所有 token 属性，触发大屏 Binding 重新求值
+            foreach (var dashboard in new[] { CursorDashboard, DeepSeekDashboard })
+            {
+                dashboard.RefreshTokenBindings();
+            }
 
             // 通知 QueryViewModel 刷新 DataGrid
             Messenger.Send(new TokenFormatChangedMessage(TokenDisplayMode));
         }
 
         /// <summary>
-        /// 跳转到设置 Tab 更新 cookie（用于 Cookie 预警条"立即更新"按钮）。
+        /// 跳转到设置 Tab 更新凭证（用于预警条"立即更新"按钮）。
         /// </summary>
         [RelayCommand]
         private void OpenSettings()

@@ -143,6 +143,17 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
         Task<UsageAggregateStats> AggregateWeeklyStatsAsync(PlatformType platform = PlatformType.Cursor, CancellationToken ct = default);
 
         /// <summary>
+        /// 聚合指定平台当天（本地 00:00 至今）的用量统计数据。
+        /// </summary>
+        /// <param name="platform">
+        /// 平台类型（默认 Cursor 向后兼容）。
+        /// </param>
+        /// <param name="ct">
+        /// 取消令牌。
+        /// </param>
+        Task<UsageAggregateStats> AggregateDailyStatsAsync(PlatformType platform = PlatformType.Cursor, CancellationToken ct = default);
+
+        /// <summary>
         /// 获取指定平台范围内第一条事件的用户邮箱（用于推断账号信息）。
         /// </summary>
         /// <param name="platform">
