@@ -241,10 +241,16 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI
 
             builder.Services.AddSingleton<ICursorApiClient>(sp => sp.GetRequiredService<CursorApiClient>());
 
+            // DeepSeek API 客户端（BaseAddress 在构造函数中固定为常量，不依赖 AppSettings）
+            builder.Services.AddHttpClient<DeepSeekApiClient>().AddPolicyHandler(GetRetryPolicy());
+            builder.Services.AddSingleton<IDeepSeekApiClient>(sp => sp.GetRequiredService<DeepSeekApiClient>());
+
             // 平台 Provider 注册：UsageSyncHostedService 通过 IEnumerable<IPlatformProvider> 接收所有平台。
             // 后续新增平台时只需在此追加 Provider 注册即可，无需修改 HostedService。
             builder.Services.AddSingleton<CursorPlatformProvider>();
             builder.Services.AddSingleton<IPlatformProvider>(sp => sp.GetRequiredService<CursorPlatformProvider>());
+            builder.Services.AddSingleton<DeepSeekPlatformProvider>();
+            builder.Services.AddSingleton<IPlatformProvider>(sp => sp.GetRequiredService<DeepSeekPlatformProvider>());
 
             // 通知
             builder.Services.AddSingleton<INotificationService, WindowsToastService>();
