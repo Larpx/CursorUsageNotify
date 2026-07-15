@@ -14,6 +14,7 @@ using Larpx.PersonalTools.CursorUsageNotify.Services.Configuration;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Export;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Http;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Notifications;
+using Larpx.PersonalTools.CursorUsageNotify.Services.Platforms;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Security;
 using Larpx.PersonalTools.CursorUsageNotify.Services.Storage;
@@ -239,6 +240,11 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI
             }).AddPolicyHandler(GetRetryPolicy());
 
             builder.Services.AddSingleton<ICursorApiClient>(sp => sp.GetRequiredService<CursorApiClient>());
+
+            // 平台 Provider 注册：UsageSyncHostedService 通过 IEnumerable<IPlatformProvider> 接收所有平台。
+            // 后续新增平台时只需在此追加 Provider 注册即可，无需修改 HostedService。
+            builder.Services.AddSingleton<CursorPlatformProvider>();
+            builder.Services.AddSingleton<IPlatformProvider>(sp => sp.GetRequiredService<CursorPlatformProvider>());
 
             // 通知
             builder.Services.AddSingleton<INotificationService, WindowsToastService>();

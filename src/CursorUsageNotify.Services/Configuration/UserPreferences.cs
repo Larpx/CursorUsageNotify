@@ -20,6 +20,16 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Configuration
         public TokenDisplayMode TokenDisplayMode { get; set; } = TokenDisplayMode.FullNumber;
 
         /// <summary>
+        /// 各平台是否启用数据采集。
+        /// 未启用的平台不刷新数据，不影响历史采集到的数据，但数据大屏不显示该平台的用量信息。
+        /// </summary>
+        public Dictionary<PlatformType, bool> PlatformEnabled { get; set; } = new()
+        {
+            [PlatformType.Cursor] = true,
+            [PlatformType.DeepSeek] = true
+        };
+
+        /// <summary>
         /// 创建默认偏好实例。
         /// </summary>
         public UserPreferences()
@@ -37,6 +47,22 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Configuration
         }
 
         /// <summary>
+        /// 检查指定平台是否启用数据采集。
+        /// </summary>
+        /// <param name="platform">平台类型。</param>
+        /// <returns>启用时返回 true；未配置时默认返回 true。</returns>
+        public bool IsPlatformEnabled(PlatformType platform)
+            => PlatformEnabled.TryGetValue(platform, out var enabled) ? enabled : true;
+
+        /// <summary>
+        /// 设置指定平台的启用状态。
+        /// </summary>
+        /// <param name="platform">平台类型。</param>
+        /// <param name="enabled">是否启用。</param>
+        public void SetPlatformEnabled(PlatformType platform, bool enabled)
+            => PlatformEnabled[platform] = enabled;
+
+        /// <summary>
         /// 从文件加载用户偏好。文件不存在时返回默认值。
         /// </summary>
         /// <param name="filePath">偏好文件路径。</param>
@@ -52,7 +78,15 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Configuration
                     if (prefs is not null)
                     {
                         // 始终更新 FilePath 为当前配置中的路径
-                        return new UserPreferences(filePath) { TokenDisplayMode = prefs.TokenDisplayMode };
+                        return new UserPreferences(filePath)
+                        {
+                            TokenDisplayMode = prefs.TokenDisplayMode,
+                            PlatformEnabled = prefs.PlatformEnabled ?? new()
+                            {
+                                [PlatformType.Cursor] = true,
+                                [PlatformType.DeepSeek] = true
+                            }
+                        };
                     }
                 }
             }

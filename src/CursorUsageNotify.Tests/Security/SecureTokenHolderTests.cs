@@ -17,7 +17,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Tests.Security
         {
             using var holder = new SecureTokenHolder();
             holder.Set("abc123");
-            Assert.True(holder.HasToken);
+            Assert.True(holder.HasToken());
         }
 
         [Fact]
@@ -26,7 +26,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Tests.Security
             using var holder = new SecureTokenHolder();
             holder.Set("abc123");
             holder.Set(string.Empty);
-            Assert.False(holder.HasToken);
+            Assert.False(holder.HasToken());
         }
 
         [Fact]
@@ -35,7 +35,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Tests.Security
             using var holder = new SecureTokenHolder();
             holder.Set("abc123");
             holder.Set(null!);
-            Assert.False(holder.HasToken);
+            Assert.False(holder.HasToken());
         }
 
         [Fact]
@@ -44,7 +44,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Tests.Security
             using var holder = new SecureTokenHolder();
             holder.Set("first");
             holder.Set("second");
-            Assert.True(holder.HasToken);
+            Assert.True(holder.HasToken());
         }
 
         [Fact]
@@ -52,7 +52,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Tests.Security
         {
             using var holder = new SecureTokenHolder();
             holder.SetBytes(System.Text.Encoding.UTF8.GetBytes("token-bytes"));
-            Assert.True(holder.HasToken);
+            Assert.True(holder.HasToken());
         }
 
         [Fact]
@@ -61,7 +61,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Tests.Security
             using var holder = new SecureTokenHolder();
             holder.Set("abc123");
             holder.SetBytes(Array.Empty<byte>());
-            Assert.False(holder.HasToken);
+            Assert.False(holder.HasToken());
         }
 
         [Fact]
@@ -70,7 +70,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Tests.Security
             using var holder = new SecureTokenHolder();
             holder.Set("abc123");
             holder.SetBytes(null!);
-            Assert.False(holder.HasToken);
+            Assert.False(holder.HasToken());
         }
 
         [Fact]
@@ -111,7 +111,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Tests.Security
             using var holder = new SecureTokenHolder();
             holder.Set("abc123");
             holder.Clear();
-            Assert.False(holder.HasToken);
+            Assert.False(holder.HasToken());
         }
 
         [Fact]
@@ -119,7 +119,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Tests.Security
         {
             using var holder = new SecureTokenHolder();
             holder.Clear();
-            Assert.False(holder.HasToken);
+            Assert.False(holder.HasToken());
         }
 
         [Fact]
@@ -128,7 +128,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Tests.Security
             var holder = new SecureTokenHolder();
             holder.Set("abc123");
             holder.Dispose();
-            Assert.False(holder.HasToken);
+            Assert.False(holder.HasToken());
         }
 
         [Fact]
@@ -139,7 +139,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Tests.Security
             holder.SetBytes(bytes);
             Array.Clear(bytes, 0, bytes.Length);
 
-            Assert.True(holder.HasToken);
+            Assert.True(holder.HasToken());
             var retrieved = await holder.UseAsync((t, _) => Task.FromResult(t), CancellationToken.None);
             Assert.Equal("owned-by-caller", retrieved);
         }

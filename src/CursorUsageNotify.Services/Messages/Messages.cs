@@ -29,6 +29,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Messages
     /// <param name="FetchTimestampMs">
     /// 拉取时间戳（epoch 毫秒）。
     /// </param>
+    /// <param name="Platform">
+    /// 数据来源平台（默认 Cursor，向后兼容）。
+    /// </param>
     public sealed record UsageDataFetchedMessage(
         int NewEventsCount,
         PeriodUsageEntity? LatestPeriod,
@@ -36,7 +39,8 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Messages
         SubscriptionEntity? LatestSubscription,
         UsageAggregateStats? AggregateStats,
         UsageAggregateStats? WeeklyAggregateStats,
-        long FetchTimestampMs);
+        long FetchTimestampMs,
+        PlatformType Platform = PlatformType.Cursor);
 
     /// <summary>
     /// 托盘"开始/暂停"或"立即拉取"指令，发送到 HostedService。
@@ -62,7 +66,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Messages
     /// <param name="Error">
     /// 错误信息。
     /// </param>
-    public sealed record SyncFailedMessage(string Error);
+    /// <param name="Platform">
+    /// 发生错误的平台（默认 Cursor，向后兼容）。
+    /// </param>
+    public sealed record SyncFailedMessage(string Error, PlatformType Platform = PlatformType.Cursor);
 
     /// <summary>
     /// Cookie/Session 临近过期或已失效通知，提醒用户更新 cookie。
@@ -73,7 +80,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Messages
     /// <param name="IsExpired">
     /// 是否已过期（true=已失效需立即更新，false=即将过期预警）。
     /// </param>
-    public sealed record CookieExpiringSoonMessage(DateTime ExpiryUtc, bool IsExpired);
+    /// <param name="Platform">
+    /// 会话过期的平台（默认 Cursor，向后兼容）。
+    /// </param>
+    public sealed record CookieExpiringSoonMessage(DateTime ExpiryUtc, bool IsExpired, PlatformType Platform = PlatformType.Cursor);
 
     /// <summary>
     /// 通知已显示，UI 更新"最近一次通知时间"。
@@ -102,7 +112,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Messages
     /// <param name="HasToken">
     /// 当前是否已持有有效 token。
     /// </param>
-    public sealed record TokenStateChangedMessage(bool HasToken);
+    /// <param name="Platform">
+    /// 状态变化的平台（默认 Cursor，向后兼容）。
+    /// </param>
+    public sealed record TokenStateChangedMessage(bool HasToken, PlatformType Platform = PlatformType.Cursor);
 
     /// <summary>
     /// 端点探测发现失效端点通知，UI 据此提示用户接口已变更。

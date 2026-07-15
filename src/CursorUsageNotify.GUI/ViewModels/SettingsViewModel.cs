@@ -132,7 +132,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         /// </summary>
         private void RefreshTokenStatus()
         {
-            HasToken = _tokenHolder.HasToken;
+            HasToken = _tokenHolder.HasToken();
             TokenMaskedDisplay = HasToken ? "●●●●●● 已设置" : string.Empty;
         }
 
