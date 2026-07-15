@@ -15,6 +15,11 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
         public string FormattedTimestamp { get; set; } = string.Empty;
 
         /// <summary>
+        /// 平台名称（Cursor / DeepSeek）。
+        /// </summary>
+        public string Platform { get; set; } = string.Empty;
+
+        /// <summary>
         /// 模型名称。
         /// </summary>
         public string Model { get; set; } = string.Empty;
@@ -108,6 +113,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
             return new UsageEventDisplayModel
             {
                 FormattedTimestamp = timestamp,
+                Platform = entity.Platform.ToString(),
                 Model = entity.Model ?? string.Empty,
                 RawInputTokens = entity.InputTokens,
                 RawOutputTokens = entity.OutputTokens,

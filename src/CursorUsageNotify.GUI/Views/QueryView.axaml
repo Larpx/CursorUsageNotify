@@ -12,13 +12,18 @@
         <!-- 顶部筛选区 -->
         <Border DockPanel.Dock="Top" Padding="16,12" Background="#FFF9FAFB" BorderBrush="#FFE5E7EB" BorderThickness="0,0,0,1">
             <StackPanel Orientation="Vertical" Spacing="6">
-                <!-- 第一行：日期 + 模型筛选 -->
+                <!-- 第一行：日期 + 平台 + 模型筛选 -->
                 <StackPanel Orientation="Horizontal" Spacing="12">
                     <TextBlock Text="起始：" VerticalAlignment="Center"/>
                     <DatePicker SelectedDate="{Binding StartTime}"/>
 
                     <TextBlock Text="结束：" VerticalAlignment="Center"/>
                     <DatePicker SelectedDate="{Binding EndTime}"/>
+
+                    <TextBlock Text="平台：" VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding PlatformOptions}"
+                              SelectedItem="{Binding SelectedPlatformOption}"
+                              MinWidth="100"/>
 
                     <TextBlock Text="模型：" VerticalAlignment="Center"/>
                     <ComboBox ItemsSource="{Binding Models}"
@@ -81,6 +86,7 @@
                 <DataGridTextColumn Header="时间"
                                     Binding="{Binding FormattedTimestamp}"
                                     Width="170"/>
+                <DataGridTextColumn Header="平台" Binding="{Binding Platform}" Width="90"/>
                 <DataGridTextColumn Header="模型" Binding="{Binding Model}" Width="180"/>
                 <DataGridTextColumn Header="输入 Token" Binding="{Binding FormattedInputTokens}" Width="110"/>
                 <DataGridTextColumn Header="输出 Token" Binding="{Binding FormattedOutputTokens}" Width="110"/>

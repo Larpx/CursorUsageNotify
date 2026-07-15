@@ -56,6 +56,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             StartTime = DateTime.Today.AddDays(-1);
             EndTime = DateTime.Today;
 
+            // 平台筛选默认"全部"
+            _selectedPlatformOption = PlatformOptions[0];
+
             Messenger.Register<UsageDataFetchedMessage>(this, async (_, _) => await LoadAsync());
             Messenger.Register<TokenFormatChangedMessage>(this, OnTokenFormatChanged);
             _ = LoadModelsAsync();
@@ -105,6 +108,36 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         /// </summary>
         [ObservableProperty]
         private List<string> _models = new();
+
+        /// <summary>
+        /// 平台筛选选项列表（包含"全部"+ 各 PlatformType）。
+        /// </summary>
+        public List<PlatformFilterOption> PlatformOptions { get; } = PlatformFilterOption.DefaultOptions();
+
+        /// <summary>
+        /// 当前选中的平台筛选项（默认"全部"）。
+        /// </summary>
+        [ObservableProperty]
+        private PlatformFilterOption _selectedPlatformOption;
+
+        /// <summary>
+        /// 切换平台筛选时重置到第一页并刷新模型下拉与数据。
+        /// </summary>
+        partial void OnSelectedPlatformOptionChanged(PlatformFilterOption value)
+        {
+            PageIndex = 1;
+            _ = LoadModelsAsync();
+            _ = LoadAsync();
+        }
+
+        /// <summary>
+        /// 切换模型筛选时重置到第一页并重新加载。
+        /// </summary>
+        partial void OnSelectedModelChanged(string? value)
+        {
+            PageIndex = 1;
+            _ = LoadAsync();
+        }
 
         /// <summary>
         /// 当前页用量事件列表（预计算格式化字符串，避免滚动时转换器开销）。
@@ -235,7 +268,8 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 ? new DateTimeOffset(EndTime.Value.Date.AddDays(1), TimeZoneInfo.Local.GetUtcOffset(EndTime.Value.Date.AddDays(1))).ToUnixTimeMilliseconds()
                 : 0;
 
-            var result = await _repository.QueryEventsPagedAsync(startMs, endMs, SelectedModel, PageIndex, PageSize);
+            var result = await _repository.QueryEventsPagedAsync(
+                startMs, endMs, SelectedModel, PageIndex, PageSize, SelectedPlatformOption.Platform);
             _rawEntities = result.Items;
             var mode = TokenFormatConverter.Mode;
             Events = result.Items.Select(e => UsageEventDisplayModel.FromEntity(e, mode)).ToList();
@@ -245,12 +279,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         }
 
         /// <summary>
-        /// 加载模型下拉选项。
+        /// 加载模型下拉选项（按当前平台筛选）。
         /// </summary>
         [RelayCommand]
         private async Task LoadModelsAsync()
         {
-            Models = await _repository.GetDistinctModelsAsync();
+            Models = await _repository.GetDistinctModelsAsync(SelectedPlatformOption.Platform);
         }
 
         /// <summary>
