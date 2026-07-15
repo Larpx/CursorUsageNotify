@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Text.Json;
 
 
 namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
@@ -73,16 +74,21 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
         public long CurrentToken { get; set; }
 
         /// <summary>
-        /// 本月已用 token（字符串形式）。
+        /// 本月已用 token。
+        /// 注意：DeepSeek API 实际返回数字，但历史版本曾返回字符串，
+        /// 使用 AllowReadingFromString 兼容两种形式。
         /// </summary>
         [JsonPropertyName("monthly_usage")]
-        public string? MonthlyUsage { get; set; }
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public long? MonthlyUsage { get; set; }
 
         /// <summary>
-        /// 总用量 token（字符串形式，可能为 0）。
+        /// 总用量 token（可能为 0）。
+        /// 注意：DeepSeek API 实际返回数字，使用 AllowReadingFromString 兼容字符串形式。
         /// </summary>
         [JsonPropertyName("total_usage")]
-        public string? TotalUsage { get; set; }
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public long? TotalUsage { get; set; }
 
         /// <summary>
         /// 正常充值钱包列表。
@@ -97,10 +103,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
         public List<DeepSeekWalletDto>? BonusWallets { get; set; }
 
         /// <summary>
-        /// 总可用 token 估算（字符串形式）。
+        /// 总可用 token 估算。
+        /// 注意：DeepSeek API 实际返回数字，使用 AllowReadingFromString 兼容字符串形式。
         /// </summary>
         [JsonPropertyName("total_available_token_estimation")]
-        public string? TotalAvailableTokenEstimation { get; set; }
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public long? TotalAvailableTokenEstimation { get; set; }
 
         /// <summary>
         /// 本月费用列表（按币种）。
@@ -109,10 +117,11 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
         public List<DeepSeekCostDto>? MonthlyCosts { get; set; }
 
         /// <summary>
-        /// 本月 token 用量（字符串形式，与 monthly_usage 相同）。
+        /// 本月 token 用量（与 monthly_usage 相同）。
         /// </summary>
         [JsonPropertyName("monthly_token_usage")]
-        public string? MonthlyTokenUsage { get; set; }
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public long? MonthlyTokenUsage { get; set; }
 
         /// <summary>
         /// 总费用列表（按币种）。
@@ -133,16 +142,19 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
         public string? Currency { get; set; }
 
         /// <summary>
-        /// 余额（字符串形式，单位元）。
+        /// 余额（单位元）。
+        /// 注意：DeepSeek API 实际返回数字，使用 AllowReadingFromString 兼容字符串形式。
         /// </summary>
         [JsonPropertyName("balance")]
-        public string? Balance { get; set; }
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public decimal? Balance { get; set; }
 
         /// <summary>
-        /// 余额对应的 token 估算（字符串形式）。
+        /// 余额对应的 token 估算。
         /// </summary>
         [JsonPropertyName("token_estimation")]
-        public string? TokenEstimation { get; set; }
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public long? TokenEstimation { get; set; }
     }
 
     /// <summary>
@@ -157,10 +169,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
         public string? Currency { get; set; }
 
         /// <summary>
-        /// 金额（字符串形式，单位元）。
+        /// 金额（单位元）。
+        /// 注意：DeepSeek API 实际返回数字，使用 AllowReadingFromString 兼容字符串形式。
         /// </summary>
         [JsonPropertyName("amount")]
-        public string? Amount { get; set; }
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public decimal? Amount { get; set; }
     }
 
     /// <summary>
@@ -394,10 +408,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
         public long Time { get; set; }
 
         /// <summary>
-        /// 费用（字符串形式，单位元）。
+        /// 费用（单位元）。
+        /// 注意：DeepSeek API 实际返回数字，使用 AllowReadingFromString 兼容字符串形式。
         /// </summary>
         [JsonPropertyName("cost")]
-        public string? Cost { get; set; }
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public decimal? Cost { get; set; }
     }
 
     /// <summary>

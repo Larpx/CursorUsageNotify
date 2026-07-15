@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using Larpx.PersonalTools.CursorUsageNotify.Core;
 using Larpx.PersonalTools.CursorUsageNotify.Models;
@@ -206,7 +205,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
 
                     foreach (var bucket in series.Buckets)
                     {
-                        var costYuan = ParseDecimal(bucket.Cost);
+                        var costYuan = bucket.Cost ?? 0m;
                         if (costYuan == 0) continue;
 
                         // 同一天同一 key 同一模型可能有多个币种，累加（实际 DeepSeek 通常单币种 CNY）
@@ -225,11 +224,11 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
         private static PeriodUsageEntity MapToPeriodEntity(
             DeepSeekUserSummaryDto summary, long startSec, long endSec, long fetchMs)
         {
-            var monthlyTokens = ParseLong(summary.MonthlyUsage);
-            var monthlyCostYuan = summary.MonthlyCosts?.FirstOrDefault()?.Amount ?? "0";
-            var monthlyCostCents = (decimal)(ParseDecimal(monthlyCostYuan) * 100);
-            var balanceYuan = summary.NormalWallets?.FirstOrDefault()?.Balance ?? "0";
-            var balanceCents = (decimal)(ParseDecimal(balanceYuan) * 100);
+            var monthlyTokens = summary.MonthlyUsage ?? 0;
+            var monthlyCostYuan = summary.MonthlyCosts?.FirstOrDefault()?.Amount ?? 0m;
+            var monthlyCostCents = monthlyCostYuan * 100;
+            var balanceYuan = summary.NormalWallets?.FirstOrDefault()?.Balance ?? 0m;
+            var balanceCents = balanceYuan * 100;
 
             return new PeriodUsageEntity
             {
@@ -256,10 +255,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
         private static SubscriptionEntity MapToSubscriptionEntity(
             DeepSeekUserSummaryDto summary, long startSec, long endSec, long fetchMs)
         {
-            var totalCostYuan = summary.TotalCosts?.FirstOrDefault()?.Amount ?? "0";
-            var totalCostCents = (decimal)(ParseDecimal(totalCostYuan) * 100);
-            var balanceYuan = summary.NormalWallets?.FirstOrDefault()?.Balance ?? "0";
-            var balanceCents = (decimal)(ParseDecimal(balanceYuan) * 100);
+            var totalCostYuan = summary.TotalCosts?.FirstOrDefault()?.Amount ?? 0m;
+            var totalCostCents = totalCostYuan * 100;
+            var balanceYuan = summary.NormalWallets?.FirstOrDefault()?.Balance ?? 0m;
+            var balanceCents = balanceYuan * 100;
 
             return new SubscriptionEntity
             {
@@ -322,11 +321,5 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
                 return null;
             }
         }
-
-        private static long ParseLong(string? value)
-            => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : 0;
-
-        private static decimal ParseDecimal(string? value)
-            => decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0m;
     }
 }

@@ -19,7 +19,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNameCaseInsensitive = true,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+            // DeepSeek API 部分数值字段在不同版本可能返回数字或字符串数字，统一允许从字符串读取数值
+            NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
         };
 
         /// <summary>
@@ -49,7 +51,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
             {
                 var summary = await GetUserSummaryAsync(userToken, ct);
                 // 用 monthly_usage 作为摘要返回（非 0 表示有数据）
-                return Result<int>.Ok((int)(summary.MonthlyUsage != null && long.TryParse(summary.MonthlyUsage, out var mu) ? mu : 0));
+                return Result<int>.Ok((int)(summary.MonthlyUsage ?? 0));
             }
             catch (DeepSeekApiAuthException ex)
             {
