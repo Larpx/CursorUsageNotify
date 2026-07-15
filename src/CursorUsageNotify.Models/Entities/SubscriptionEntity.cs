@@ -1,12 +1,13 @@
 ﻿using SqlSugar;
+using Larpx.PersonalTools.CursorUsageNotify.Models;
 
 
 namespace Larpx.PersonalTools.CursorUsageNotify.Models.Entities
 {
     /// <summary>
-    /// 订阅/账单信息快照。
+    /// 订阅/账单信息快照，支持多平台。
     /// 从 /dashboard/billing 页面抓取，包含订阅起始日期、状态、发票历史等。
-    /// 去重键：SnapshotTime（按小时截断）。
+    /// 去重键：SnapshotTime（按小时截断）+ Platform。
     /// </summary>
     [SugarTable("subscription_info")]
     public sealed class SubscriptionEntity
@@ -16,6 +17,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Entities
         /// </summary>
         [SugarColumn(IsPrimaryKey = true, IsIdentity = true, ColumnName = "id", ColumnDataType = "INTEGER")]
         public long Id { get; set; }
+
+        /// <summary>
+        /// 数据来源平台（0=Cursor, 1=DeepSeek）。默认 0 保持向后兼容。
+        /// </summary>
+        [SugarColumn(ColumnName = "platform", IsNullable = false)]
+        public PlatformType Platform { get; set; } = PlatformType.Cursor;
 
         /// <summary>
         /// 快照时间（epoch 毫秒，按小时截断作为去重键）。

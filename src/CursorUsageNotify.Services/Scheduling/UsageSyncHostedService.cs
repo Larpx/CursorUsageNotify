@@ -285,9 +285,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
             }
 
             // 聚合统计与消息广播
-            var latestPeriod = await _repository.GetLatestPeriodUsageAsync(ct);
-            var latestUser = await _repository.GetLatestUserInfoAsync(ct);
-            var latestSub = await _repository.GetLatestSubscriptionAsync(ct);
+            var latestPeriod = await _repository.GetLatestPeriodUsageAsync(provider.Platform, ct);
+            var latestUser = await _repository.GetLatestUserInfoAsync(provider.Platform, ct);
+            var latestSub = await _repository.GetLatestSubscriptionAsync(provider.Platform, ct);
 
             // 按订阅周期从 events 表聚合统计
             var aggPeriodStart = latestSub?.CurrentPeriodStart
@@ -298,10 +298,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
                                ?? 0;
 
             var aggStats = aggPeriodStart > 0 && aggPeriodEnd > 0
-                ? await _repository.AggregateStatsAsync(aggPeriodStart, aggPeriodEnd, ct)
+                ? await _repository.AggregateStatsAsync(aggPeriodStart, aggPeriodEnd, provider.Platform, ct)
                 : null;
 
-            var weeklyStats = await _repository.AggregateWeeklyStatsAsync(ct);
+            var weeklyStats = await _repository.AggregateWeeklyStatsAsync(provider.Platform, ct);
 
             _messenger.Send(new UsageDataFetchedMessage(
                 inserted, latestPeriod, latestUser, latestSub, aggStats, weeklyStats, nowMs, provider.Platform));
@@ -353,7 +353,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
         {
             try
             {
-                var period = await _repository.GetLatestPeriodUsageAsync(ct);
+                var period = await _repository.GetLatestPeriodUsageAsync(PlatformType.Cursor, ct);
                 if (period is null)
                 {
                     return;

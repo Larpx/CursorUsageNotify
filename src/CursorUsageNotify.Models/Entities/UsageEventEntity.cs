@@ -1,11 +1,12 @@
 ﻿using SqlSugar;
+using Larpx.PersonalTools.CursorUsageNotify.Models;
 
 
 namespace Larpx.PersonalTools.CursorUsageNotify.Models.Entities
 {
     /// <summary>
-    /// 单次 Cursor 用量事件（一次 API 调用 = 一行）。
-    /// 去重键：Timestamp + UserEmail，避免定时任务重复插入脏数据。
+    /// 单次用量事件（一次 API 调用 = 一行），支持多平台。
+    /// 去重键：Timestamp + UserEmail + Platform，避免定时任务重复插入脏数据。
     /// </summary>
     [SugarTable("usage_events")]
     public sealed class UsageEventEntity
@@ -15,6 +16,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Entities
         /// </summary>
         [SugarColumn(IsPrimaryKey = true, IsIdentity = true, ColumnName = "id", ColumnDataType = "INTEGER")]
         public long Id { get; set; }
+
+        /// <summary>
+        /// 数据来源平台（0=Cursor, 1=DeepSeek）。默认 0 保持向后兼容。
+        /// </summary>
+        [SugarColumn(ColumnName = "platform", IsNullable = false)]
+        public PlatformType Platform { get; set; } = PlatformType.Cursor;
 
         /// <summary>
         /// 事件发生时间（epoch 毫秒，来自 API 响应 timestamp 字段）。

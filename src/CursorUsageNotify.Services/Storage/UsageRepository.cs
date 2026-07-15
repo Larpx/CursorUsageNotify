@@ -1,4 +1,5 @@
 using Larpx.PersonalTools.CursorUsageNotify.Core;
+using Larpx.PersonalTools.CursorUsageNotify.Models;
 using Larpx.PersonalTools.CursorUsageNotify.Models.Dtos;
 using Larpx.PersonalTools.CursorUsageNotify.Models.Entities;
 using Microsoft.Extensions.Logging;
@@ -9,6 +10,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
 {
     /// <summary>
     /// 用量数据仓储实现，基于 SqlSugar Storageable 实现 upsert 去重。
+    /// 多平台支持：所有查询与 upsert 均按 Platform 字段区分。
     /// </summary>
     public sealed class UsageRepository : IUsageRepository
     {
@@ -34,7 +36,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
             }
 
             var x = _db.Storageable(list)
-                .WhereColumns(p => new { p.Timestamp, p.UserEmail })
+                .WhereColumns(p => new { p.Timestamp, p.UserEmail, p.Platform })
                 .ToStorage();
 
             var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
@@ -51,7 +53,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
             entity.FetchTime = (entity.FetchTime / 1000) * 1000;
 
             var x = _db.Storageable(entity)
-                .WhereColumns(p => p.FetchTime)
+                .WhereColumns(p => new { p.FetchTime, p.Platform })
                 .ToStorage();
 
             var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
@@ -67,7 +69,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
             entity.SnapshotTime = (entity.SnapshotTime / 60000) * 60000;
 
             var x = _db.Storageable(entity)
-                .WhereColumns(p => new { p.Email, p.SnapshotTime })
+                .WhereColumns(p => new { p.Email, p.SnapshotTime, p.Platform })
                 .ToStorage();
 
             var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
@@ -78,7 +80,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
         /// <inheritdoc/>
         public async Task<PagedResult<UsageEventEntity>> QueryEventsPagedAsync(
             long startTime = 0, long endTime = 0, string? model = null,
-            int pageIndex = 1, int pageSize = 100, CancellationToken ct = default)
+            int pageIndex = 1, int pageSize = 100,
+            PlatformType? platform = PlatformType.Cursor,
+            CancellationToken ct = default)
         {
             var query = _db.Queryable<UsageEventEntity>();
 
@@ -93,6 +97,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
             if (!string.IsNullOrEmpty(model))
             {
                 query = query.Where(e => e.Model == model);
+            }
+            if (platform is not null)
+            {
+                query = query.Where(e => e.Platform == platform);
             }
 
             var total = await query.CountAsync(ct);
@@ -111,27 +119,33 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
         }
 
         /// <inheritdoc/>
-        public async Task<List<string>> GetDistinctModelsAsync(CancellationToken ct = default)
+        public async Task<List<string>> GetDistinctModelsAsync(PlatformType? platform = PlatformType.Cursor, CancellationToken ct = default)
         {
-            return await _db.Queryable<UsageEventEntity>()
-                .Where(e => e.Model != null && e.Model != "")
-                .Select(e => e.Model!)
+            var query = _db.Queryable<UsageEventEntity>()
+                .Where(e => e.Model != null && e.Model != "");
+            if (platform is not null)
+            {
+                query = query.Where(e => e.Platform == platform);
+            }
+            return await query.Select(e => e.Model!)
                 .Distinct()
                 .ToListAsync(ct);
         }
 
         /// <inheritdoc/>
-        public async Task<PeriodUsageEntity?> GetLatestPeriodUsageAsync(CancellationToken ct = default)
+        public async Task<PeriodUsageEntity?> GetLatestPeriodUsageAsync(PlatformType platform = PlatformType.Cursor, CancellationToken ct = default)
         {
             return await _db.Queryable<PeriodUsageEntity>()
+                .Where(e => e.Platform == platform)
                 .OrderBy(e => e.FetchTime, OrderByType.Desc)
                 .FirstAsync(ct);
         }
 
         /// <inheritdoc/>
-        public async Task<UserInfoEntity?> GetLatestUserInfoAsync(CancellationToken ct = default)
+        public async Task<UserInfoEntity?> GetLatestUserInfoAsync(PlatformType platform = PlatformType.Cursor, CancellationToken ct = default)
         {
             return await _db.Queryable<UserInfoEntity>()
+                .Where(e => e.Platform == platform)
                 .OrderBy(e => e.SnapshotTime, OrderByType.Desc)
                 .FirstAsync(ct);
         }
@@ -153,7 +167,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
             entity.SnapshotTime = (entity.SnapshotTime / 3600000) * 3600000;
 
             var x = _db.Storageable(entity)
-                .WhereColumns(p => p.SnapshotTime)
+                .WhereColumns(p => new { p.SnapshotTime, p.Platform })
                 .ToStorage();
 
             var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
@@ -162,15 +176,19 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
         }
 
         /// <inheritdoc/>
-        public async Task<SubscriptionEntity?> GetLatestSubscriptionAsync(CancellationToken ct = default)
+        public async Task<SubscriptionEntity?> GetLatestSubscriptionAsync(PlatformType platform = PlatformType.Cursor, CancellationToken ct = default)
         {
             return await _db.Queryable<SubscriptionEntity>()
+                .Where(e => e.Platform == platform)
                 .OrderBy(e => e.SnapshotTime, OrderByType.Desc)
                 .FirstAsync(ct);
         }
 
         /// <inheritdoc/>
-        public async Task<UsageAggregateStats> AggregateStatsAsync(long periodStart, long periodEnd, CancellationToken ct = default)
+        public async Task<UsageAggregateStats> AggregateStatsAsync(
+            long periodStart, long periodEnd,
+            PlatformType platform = PlatformType.Cursor,
+            CancellationToken ct = default)
         {
             if (periodStart <= 0 || periodEnd <= 0 || periodStart >= periodEnd)
             {
@@ -178,6 +196,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
             }
 
             var events = await _db.Queryable<UsageEventEntity>()
+                .Where(e => e.Platform == platform)
                 .Where(e => e.Timestamp >= periodStart && e.Timestamp <= periodEnd)
                 .ToListAsync(ct);
 
@@ -199,16 +218,17 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
         }
 
         /// <inheritdoc/>
-        public async Task<string?> GetFirstUserEmailAsync(CancellationToken ct = default)
+        public async Task<string?> GetFirstUserEmailAsync(PlatformType platform = PlatformType.Cursor, CancellationToken ct = default)
         {
             var first = await _db.Queryable<UsageEventEntity>()
+                .Where(e => e.Platform == platform)
                 .OrderBy(e => e.Timestamp, OrderByType.Asc)
                 .FirstAsync(ct);
             return first?.UserEmail;
         }
 
         /// <inheritdoc/>
-        public async Task<UsageAggregateStats> AggregateWeeklyStatsAsync(CancellationToken ct = default)
+        public async Task<UsageAggregateStats> AggregateWeeklyStatsAsync(PlatformType platform = PlatformType.Cursor, CancellationToken ct = default)
         {
             var now = DateTime.Now;
             var daysSinceMonday = now.DayOfWeek == DayOfWeek.Sunday ? 6 : (int)now.DayOfWeek - (int)DayOfWeek.Monday;
@@ -217,7 +237,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
             var weekStart = new DateTimeOffset(monday, TimeZoneInfo.Local.GetUtcOffset(monday)).ToUnixTimeMilliseconds();
             var weekEnd = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            return await AggregateStatsAsync(weekStart, weekEnd, ct);
+            return await AggregateStatsAsync(weekStart, weekEnd, platform, ct);
         }
     }
 }

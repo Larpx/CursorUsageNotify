@@ -1,11 +1,12 @@
 ﻿using SqlSugar;
+using Larpx.PersonalTools.CursorUsageNotify.Models;
 
 
 namespace Larpx.PersonalTools.CursorUsageNotify.Models.Entities
 {
     /// <summary>
-    /// 当前计费周期用量汇总快照。
-    /// 去重键：FetchTime（按秒截断），同一秒内多次拉取视为同一条。
+    /// 当前计费周期用量汇总快照，支持多平台。
+    /// 去重键：FetchTime（按秒截断）+ Platform，同一秒内多次拉取视为同一条。
     /// </summary>
     [SugarTable("period_usage")]
     public sealed class PeriodUsageEntity
@@ -15,6 +16,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Entities
         /// </summary>
         [SugarColumn(IsPrimaryKey = true, IsIdentity = true, ColumnName = "id", ColumnDataType = "INTEGER")]
         public long Id { get; set; }
+
+        /// <summary>
+        /// 数据来源平台（0=Cursor, 1=DeepSeek）。默认 0 保持向后兼容。
+        /// </summary>
+        [SugarColumn(ColumnName = "platform", IsNullable = false)]
+        public PlatformType Platform { get; set; } = PlatformType.Cursor;
 
         /// <summary>
         /// 本快照入库时间（epoch 毫秒，按秒截断作为去重键）。

@@ -1,11 +1,12 @@
 ﻿using SqlSugar;
+using Larpx.PersonalTools.CursorUsageNotify.Models;
 
 
 namespace Larpx.PersonalTools.CursorUsageNotify.Models.Entities
 {
     /// <summary>
-    /// 用户/订阅信息快照（用于数据大屏展示）。
-    /// 去重键：Email + SnapshotTime（按分钟截断）。
+    /// 用户/订阅信息快照（用于数据大屏展示），支持多平台。
+    /// 去重键：Email + SnapshotTime（按分钟截断）+ Platform。
     /// </summary>
     [SugarTable("user_info")]
     public sealed class UserInfoEntity
@@ -15,6 +16,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Entities
         /// </summary>
         [SugarColumn(IsPrimaryKey = true, IsIdentity = true, ColumnName = "id", ColumnDataType = "INTEGER")]
         public long Id { get; set; }
+
+        /// <summary>
+        /// 数据来源平台（0=Cursor, 1=DeepSeek）。默认 0 保持向后兼容。
+        /// </summary>
+        [SugarColumn(ColumnName = "platform", IsNullable = false)]
+        public PlatformType Platform { get; set; } = PlatformType.Cursor;
 
         /// <summary>
         /// 用户邮箱。
