@@ -170,6 +170,16 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         private void OnDataFetched(object recipient, UsageDataFetchedMessage msg)
         {
             IsSyncing = false;
+            // 同步成功后，清除该平台的"凭证已失效"红色警告（#dc3545）。
+            // 黄色即将过期警告（#f59e0b）保留：CheckSessionExpiry 会按实际有效期重新评估。
+            // 其他平台的警告不受本次同步成功影响。
+            if (!string.IsNullOrEmpty(CookieStatusText)
+                && CookieStatusColor == "#dc3545"
+                && CookieStatusText.Contains(msg.Platform.ToString()))
+            {
+                CookieStatusText = string.Empty;
+                CookieStatusColor = string.Empty;
+            }
             _ = LoadPlatformAsync(msg);
         }
 

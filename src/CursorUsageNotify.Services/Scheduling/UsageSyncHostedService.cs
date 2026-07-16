@@ -331,11 +331,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
                 var periodTokens = periodStats?.TotalTokens ?? 0;
                 var weekTokens = weeklyStats?.TotalTokens ?? 0;
                 var mode = _options.TokenDisplayMode;
+                var currency = GetCurrencySymbol(platform);
 
                 var title = $"{platform} 用量更新";
                 var body = $"新增 {newEventsCount} 条事件\n"
-                           + $"本周期：{TokenFormatter.Format(periodTokens, mode)} tokens，${periodSpend:F2}\n"
-                           + $"本周：{TokenFormatter.Format(weekTokens, mode)} tokens，${weekSpend:F2}";
+                           + $"本周期：{TokenFormatter.Format(periodTokens, mode)} tokens，{currency}{periodSpend:F2}\n"
+                           + $"本周：{TokenFormatter.Format(weekTokens, mode)} tokens，{currency}{weekSpend:F2}";
 
                 await _notification.ShowAsync(title, body, ct);
 
@@ -353,16 +354,33 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
         {
             try
             {
-                var period = await _repository.GetLatestPeriodUsageAsync(PlatformType.Cursor, ct);
-                if (period is null)
+                // 遍历所有启用且持有 token 的平台，汇总各平台本周期用量。
+                // 旧版本硬编码仅查询 Cursor，导致 DeepSeek 数据无法出现在定时提醒中。
+                var lines = new List<string>();
+                var hasData = false;
+
+                foreach (var provider in _providers)
                 {
-                    return;
+                    if (!_userPrefs.IsPlatformEnabled(provider.Platform))
+                        continue;
+                    if (!_tokenHolder.HasToken(provider.Platform))
+                        continue;
+
+                    var period = await _repository.GetLatestPeriodUsageAsync(provider.Platform, ct);
+                    if (period is null)
+                        continue;
+
+                    hasData = true;
+                    var currency = GetCurrencySymbol(provider.Platform);
+                    var totalSpend = period.TotalSpendCents / 100m;
+                    lines.Add($"{provider.Platform}：{period.UsedTokens:N0} tokens，{currency}{totalSpend:F2}");
                 }
 
-                var usedTokens = period.UsedTokens;
-                var totalSpend = period.TotalSpendCents / 100m;
+                if (!hasData)
+                    return;
+
                 var title = "用量提醒";
-                var body = $"本周期已用 token：{usedTokens:N0}\n本周期支出：${totalSpend:F2}";
+                var body = string.Join("\n", lines);
 
                 await _notification.ShowAsync(title, body, ct);
 
@@ -375,6 +393,16 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
                 _logger.LogError(ex, "通知发送失败");
             }
         }
+
+        /// <summary>
+        /// 获取平台对应的货币符号：Cursor 按美元计费（$），DeepSeek 按人民币计费（¥）。
+        /// </summary>
+        private static string GetCurrencySymbol(PlatformType platform) => platform switch
+        {
+            PlatformType.Cursor => "$",
+            PlatformType.DeepSeek => "¥",
+            _ => "$"
+        };
 
         /// <summary>
         /// 检测会话过期时间，临近过期（7 天内）或已过期时通知 UI 提醒用户更新。

@@ -132,6 +132,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
             }
 
             // 6. 映射用户信息（用 API Key 名称作为用户标识）
+            // DeepSeek 无订阅/限额概念，限额相关字段设为 0 兼容旧库 NOT NULL 约束
             UserInfoEntity? userEntity = null;
             var firstKeyName = keys?.ApiKeys?.FirstOrDefault()?.Name;
             if (firstKeyName is not null)
@@ -143,8 +144,8 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
                     Name = firstKeyName,
                     PlanName = null,
                     Role = null,
-                    MonthlyLimitDollars = null,
-                    HardLimitOverrideDollars = null,
+                    MonthlyLimitDollars = 0,
+                    HardLimitOverrideDollars = 0,
                     SnapshotTime = nowMs
                 };
             }

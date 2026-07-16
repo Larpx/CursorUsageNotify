@@ -55,8 +55,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Entities
 
         /// <summary>
         /// 硬性限额覆盖（美元，0 表示无覆盖）。
+        /// DeepSeek 无此概念，存储 null。
         /// </summary>
-        [SugarColumn(ColumnName = "hard_limit_override_dollars")]
+        [SugarColumn(ColumnName = "hard_limit_override_dollars", IsNullable = true)]
         public decimal? HardLimitOverrideDollars { get; set; }
 
         /// <summary>
