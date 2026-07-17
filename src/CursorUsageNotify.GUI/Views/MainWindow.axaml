@@ -347,12 +347,11 @@
             </Grid>
         </Border>
 
-        <!-- 底部状态栏：刷新 + 切换单位按钮 + 状态灯（hover 显示各平台同步状态）+ 状态文本 -->
+        <!-- 底部状态栏：左按钮，右状态灯+文本 -->
         <Border DockPanel.Dock="Bottom" Background="#FFF3F4F6" BorderBrush="#FFE5E7EB" BorderThickness="0,1,0,0" Padding="12,6">
             <Grid ColumnDefinitions="Auto,*,Auto">
-                <!-- 左：操作按钮 + 状态灯 + 状态文本 -->
+                <!-- 左：操作按钮 -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <!-- 立即刷新按钮 -->
                     <Button Classes="RefreshBtn"
                             Width="32" Height="32"
                             Padding="0"
@@ -365,7 +364,6 @@
                               Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"/>
                     </Button>
 
-                    <!-- 切换单位按钮 -->
                     <Button Classes="TokenFormatBtn"
                             Command="{Binding CycleTokenFormatCommand}"
                             Content="{Binding TokenFormatLabel}"
@@ -373,16 +371,14 @@
                             Padding="10,4"
                             FontSize="12"
                             VerticalAlignment="Center"/>
-
-                    <!-- 状态灯（带 tooltip 显示各平台同步状态和时间） -->
-                    <Ellipse Width="10" Height="10" Fill="{Binding StatusColor}"
-                             ToolTip.Tip="{Binding StatusTooltip}"
-                             VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#FF1F2937" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- 右：留空（原同步时间已移除，移到状态灯 tooltip） -->
-                <TextBlock Grid.Column="2" Text="" FontSize="12"/>
+                <!-- 右：状态灯 + 状态文本（hover 显示各平台同步详情） -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                            ToolTip.Tip="{Binding StatusTooltip}">
+                    <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#FF1F2937" VerticalAlignment="Center"/>
+                    <Ellipse Width="10" Height="10" Fill="{Binding StatusColor}" VerticalAlignment="Center"/>
+                </StackPanel>
             </Grid>
         </Border>
 

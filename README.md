@@ -1,205 +1,84 @@
-# CursorUsageNotify — Cursor 用量监控桌面应用
+# CursorUsageNotify — AI 用量监控桌面应用
 
-Windows 桌面应用，通过调用 Cursor 内部 Dashboard API 定时拉取用量事件，本地存储并可视化展示，支持系统托盘后台运行与 Toast 通知。
+Windows 桌面应用，同时支持 **Cursor** 与 **DeepSeek** 平台用量采集：定时拉取、本地 SQLite 存储、双列数据大屏、系统托盘与 Toast 通知。
 
 ## 功能
 
-- **数据大屏** — 四行布局展示全量信息：
-  - 第一行：用户名（含订阅类型 pro/pro+）、订阅起始、订阅结束、订阅状态、发票数
-  - 第二行：本周用量（输入/输出/缓存读/缓存写/总用量/费用）
-  - 第三行：本周期用量（输入/输出/缓存读/缓存写/总用量/费用）
-  - 第四行：最近拉取时间、同步状态
-- **事件查询** — 按时间范围、模型筛选用量明细，支持每页 10/20/50/100 行可选，CSV 导出
-- **定时同步** — 后台服务按可配置间隔自动拉取数据，增量入库去重
-- **同步成功通知** — 每次同步成功（含启动首次拉取）推送 Toast 通知，含新增事件数和用量摘要
-- **Cookie 过期检测** — 自动检测 Session 过期时间，剩余 ≤7 天黄色预警，已过期红色预警，支持一键打开浏览器更新
-- **系统托盘** — 最小化到托盘，支持开始/暂停同步、退出
-- **Cookie 认证** — 支持直接粘贴完整 Cookie 字符串，自动解析 `WorkosCursorSessionToken`
-- **安全存储** — 使用 Windows DPAPI 加密持久化凭证
-- **缩放优化** — DataGrid 列宽固定，避免窗口缩放时重新计算布局导致卡顿
+- **双平台数据大屏**
+  - **Cursor**：账户/订阅周期、当天/本周/本周期 Token 与费用（含缓存读写）
+  - **DeepSeek**：账户余额、累计消费、总请求次数；当天/本周/本月 Token；悬停显示各 API Key × 模型明细
+- **DeepSeek 大屏模式**（设置中持久化）：汇总全部 API Key，或仅显示单个 Key
+- **事件查询** — 按平台/时间/模型筛选，分页与 CSV 导出
+- **定时同步** — 后台按间隔拉取；Cursor 增量，DeepSeek 拉取「当前日往前两个自然月」全量窗口
+- **分平台通知开关** — 设置中可分别开关 Cursor / DeepSeek 用量通知；全部关闭则不发通知
+- **Cookie / Token 认证** — Cursor Cookie；DeepSeek `userToken`（Local Storage）
+- **安全存储** — Windows DPAPI 加密凭证（`secrets.dat` / `secrets_deepseek.dat`）
+- **系统托盘** — 最小化驻留，开始/暂停同步、退出
+- **Cookie 过期检测**（Cursor）— ≤7 天黄预警，已过期红预警
 
 ## 系统要求
 
 - Windows 10 (10.0.18362+) 或更高版本
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)（开发/构建）
-- Cursor 账号（需从浏览器获取 `WorkosCursorSessionToken`）
+- Cursor 账号（浏览器 Cookie）和/或 DeepSeek 开放平台账号（`userToken`）
 
 ## 快速开始
 
-### 获取 Cookie
+### Cursor：获取 Cookie
 
-1. 在浏览器中登录 [cursor.com](https://cursor.com)
-2. 打开开发者工具（F12）→ **Application**（应用）→ **Cookies**
-3. 复制 `WorkosCursorSessionToken` 的值，或直接复制完整的 Cookie 字符串
-4. 打开本应用的 **设置** → **Cookie 认证** → 粘贴
+1. 登录 [cursor.com](https://cursor.com)
+2. F12 → **Application** → **Cookies**
+3. 复制 `WorkosCursorSessionToken` 或完整 Cookie
+4. 应用 **设置** → Cursor 平台 → 粘贴并测试连接
+
+### DeepSeek：获取 userToken
+
+1. 登录 [platform.deepseek.com](https://platform.deepseek.com/usage)
+2. F12 → **Application** → **Local Storage** → 复制 `userToken`（JSON 或裸 token 均可）
+3. 应用 **设置** → DeepSeek 平台 → 粘贴并测试连接
 
 ### 构建运行
 
 ```bash
-# 克隆仓库
 git clone <repo-url>
 cd CursorUsageNotify
 
-# 构建
 dotnet build src/CursorUsageNotify.GUI/CursorUsageNotify.GUI.csproj
-
-# 运行
 dotnet run --project src/CursorUsageNotify.GUI/CursorUsageNotify.GUI.csproj
 ```
 
-### VS Code 调试
+### 测试
 
-在项目根目录创建 `.vscode/launch.json` 和 `.vscode/tasks.json`（见下方资产模板），按 F5 即可调试。
-
-<details>
-<summary>.vscode/launch.json</summary>
-
-```json
-{
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Debug (GUI)",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/CursorUsageNotify.GUI/bin/Debug/net10.0-windows10.0.18362.0/CursorUsageNotify.GUI.exe",
-            "args": [],
-            "cwd": "${workspaceFolder}/src/CursorUsageNotify.GUI",
-            "stopAtEntry": false,
-            "console": "internalConsole",
-            "env": {
-                "DOTNET_ENVIRONMENT": "Development"
-            },
-            "sourceFileMap": {
-                "/Views": "${workspaceFolder}/src/CursorUsageNotify.GUI/Views"
-            }
-        }
-    ]
-}
+```bash
+dotnet test src/CursorUsageNotify.Tests/CursorUsageNotify.Tests.csproj
 ```
 
-</details>
-
-<details>
-<summary>.vscode/tasks.json</summary>
-
-```json
-{
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "build",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-                "${workspaceFolder}/src/CursorUsageNotify.GUI/CursorUsageNotify.GUI.csproj",
-                "-c",
-                "Debug"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "test",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "test",
-                "${workspaceFolder}/src/CursorUsageNotify.Tests/CursorUsageNotify.Tests.csproj",
-                "-c",
-                "Debug",
-                "-v",
-                "n"
-            ],
-            "group": {
-                "kind": "test",
-                "isDefault": true
-            },
-            "problemMatcher": "$msCompile"
-        }
-    ]
-}
-```
-
-</details>
+VS Code / Cursor 可使用仓库内 `.vscode/launch.json`、`.vscode/tasks.json`，F5 调试或运行 test 任务。
 
 ## 项目结构
 
-所有项目统一使用 `Larpx.PersonalTools.CursorUsageNotify` 命名空间前缀，采用块级命名空间风格。
+命名空间前缀：`Larpx.PersonalTools.CursorUsageNotify`（块级命名空间）。
 
 ```
 src/
-├── CursorUsageNotify.Core/          # 核心抽象与配置
-│   ├── Constants.cs                  # API 路径、Cookie 名、User-Agent 等常量
-│   ├── Result.cs                     # Result<T> 返回类型（Ok/Fail）
-│   ├── PagedResult.cs                # 分页结果包装
-│   └── Configuration/
-│       └── AppSettings.cs            # 应用配置模型
-│
-├── CursorUsageNotify.Models/        # 数据模型
-│   ├── Entities/                     # SQLite 表实体
-│   │   ├── UsageEventEntity.cs       # 单次用量事件
-│   │   ├── PeriodUsageEntity.cs      # 计费周期汇总快照
-│   │   ├── UserInfoEntity.cs         # 用户信息快照
-│   │   └── SubscriptionEntity.cs     # 订阅信息快照
-│   ├── Dtos/                         # API 响应 DTO
-│   │   ├── CursorUsageEventDto.cs    # 用量事件 DTO
-│   │   ├── CursorPeriodUsageDto.cs   # 周期用量汇总 DTO
-│   │   ├── CursorBillingDto.cs       # 订阅/资料/周期/发票/会话 DTO
-│   │   └── UsageAggregateStats.cs    # 聚合统计结果
-│   └── Api/
-│       └── CursorApiResponse.cs      # API 响应包装
-│
-├── CursorUsageNotify.Services/      # 业务逻辑
-│   ├── Http/
-│   │   ├── ICursorApiClient.cs       # API 客户端接口
-│   │   ├── CursorApiClient.cs        # HTTP 实现（Cookie 认证）
-│   │   └── CursorApiException.cs     # 异常层次（Auth/BadRequest/RateLimit）
-│   ├── Storage/
-│   │   ├── IDbContext.cs             # 数据库上下文接口
-│   │   ├── DbContext.cs              # SQLite/SqlSugar 实现
-│   │   ├── IUsageRepository.cs       # 仓储接口
-│   │   └── UsageRepository.cs        # upsert 去重 + 聚合查询
-│   ├── Scheduling/
-│   │   ├── UsageSyncHostedService.cs # 后台定时同步服务
-│   │   └── UsageSyncOptions.cs       # 运行时选项（可热更新）
-│   ├── Security/
-│   │   └── TokenProtector.cs         # DPAPI 加密/解密
-│   ├── Notifications/
-│   │   ├── INotificationService.cs   # 通知服务接口
-│   │   └── WindowsToastService.cs    # Windows Toast 实现
-│   ├── Export/
-│   │   ├── ICsvExporter.cs           # CSV 导出接口
-│   │   └── CsvExporter.cs            # CsvHelper 实现
-│   └── Messages/
-│       └── Messages.cs               # CommunityToolkit.Mvvm 消息类型
-│
-├── CursorUsageNotify.GUI/           # Avalonia 桌面 UI
-│   ├── ViewModels/
-│   │   ├── ViewModelBase.cs          # ViewModel 基类
-│   │   ├── MainViewModel.cs          # 数据大屏
-│   │   ├── QueryViewModel.cs         # 查询 Tab
-│   │   └── SettingsViewModel.cs      # 设置 Tab
-│   ├── Views/
-│   │   ├── MainWindow.axaml/cs       # 主窗口
-│   │   ├── QueryView.axaml/cs        # 查询视图
-│   │   └── SettingsView.axaml/cs     # 设置视图
-│   ├── Tray/
-│   │   └── TrayIconHost.cs           # 系统托盘
-│   ├── Converters/                   # 值转换器
-│   ├── App.axaml/cs                  # Application 入口
-│   └── Program.cs                    # Host 构建 + 服务注册
-│
-└── CursorUsageNotify.Tests/         # 单元测试（xUnit）
-    └── Services/
-        ├── CursorApiClientTests.cs   # HTTP 客户端测试
-        ├── UsageRepositoryTests.cs   # 仓储层测试
-        └── CsvExporterTests.cs       # CSV 导出测试
+├── CursorUsageNotify.Core/           # 常量、Result、AppSettings
+├── CursorUsageNotify.Models/         # 实体、DTO、PlatformType、DeepSeekDashboardMode
+├── CursorUsageNotify.Services/       # HTTP / 仓储 / 同步 / 通知 / 偏好
+│   ├── Http/                         # CursorApiClient、DeepSeekApiClient
+│   ├── Platforms/                    # CursorPlatformProvider、DeepSeekPlatformProvider
+│   ├── Storage/                      # SqlSugar + UsageRepository
+│   ├── Scheduling/                   # UsageSyncHostedService
+│   ├── Configuration/                # UserPreferences（平台启用、通知、DeepSeek 大屏模式）
+│   └── ...
+├── CursorUsageNotify.GUI/            # Avalonia MVVM 桌面 UI
+└── CursorUsageNotify.Tests/          # xUnit 单元测试
+    ├── Services/
+    │   ├── UsageRepositoryTests.cs
+    │   ├── UserPreferencesTests.cs
+    │   ├── CursorApiClientTests.cs
+    │   └── CsvExporterTests.cs
+    ├── Security/
+    └── Http/
 ```
 
 ## 技术栈
@@ -208,78 +87,60 @@ src/
 |---|---|
 | 框架 | .NET 10 (Windows) |
 | UI | Avalonia / Fluent Theme / DataGrid |
-| MVVM | CommunityToolkit.Mvvm（源生成器） |
+| MVVM | CommunityToolkit.Mvvm |
 | ORM | SqlSugarCore + SQLite |
-| 日志 | Serilog（文件 + 控制台） |
-| HTTP | HttpClient + Polly（指数退避重试） |
-| 安全 | System.Security.Cryptography.ProtectedData |
+| 日志 | Serilog |
+| HTTP | HttpClient + Polly |
+| 安全 | DPAPI (`ProtectedData`) |
 | 导出 | CsvHelper |
 | 通知 | CommunityToolkit.WinUI.Notifications |
-| 测试 | xUnit / FluentAssertions / NSubstitute |
+| 测试 | xUnit |
 
 ## 架构要点
 
-### API 调用
+### Cursor API（Cookie 认证）
 
-通过 Cursor 内部 Dashboard API 获取数据，所有端点均使用 Cookie 认证：
+| 端点 | 用途 |
+|---|---|
+| `/api/dashboard/get-filtered-usage-events` | 用量事件（分页） |
+| `/api/dashboard/get-current-period-usage` | 当前周期汇总 |
+| `/api/auth/stripe` | 订阅计划/状态 |
+| `/api/dashboard/get-user-profile` | 用户资料 |
+| `/api/dashboard/get-current-billing-cycle` | 计费周期 |
+| `/api/dashboard/list-invoices` | 发票 |
+| `/api/auth/sessions` | Session 过期检测 |
 
-| 端点 | 方法 | 用途 |
-|---|---|---|
-| `/api/dashboard/get-filtered-usage-events` | POST | 用量事件明细（分页） |
-| `/api/dashboard/get-current-period-usage` | GET | 当前周期用量汇总 |
-| `/api/auth/stripe` | GET | Stripe 订阅信息（计划/状态） |
-| `/api/dashboard/get-user-profile` | GET | 用户资料（handle/displayName） |
-| `/api/dashboard/get-current-billing-cycle` | GET | 计费周期起止时间 |
-| `/api/dashboard/list-invoices` | GET | 发票列表 |
-| `/api/auth/sessions` | GET | 会话列表（检测 Cookie 过期） |
+### DeepSeek API（Bearer userToken）
 
-### 增量同步与通知
+| 端点 | 用途 |
+|---|---|
+| `/api/v0/users/get_user_summary` | 充值余额、本月/累计消费 |
+| `/auth-api/v0/users/current` | 用户邮箱/手机号/资料 |
+| `/api/v0/users/get_api_keys` | 账户全部 API Key 列表 |
+| `/api/v0/usage/by_api_key/amount` | 按 Key×模型每日 Token / REQUEST |
+| `/api/v0/usage/by_api_key/cost` | 按 Key×模型每日费用 |
 
-`UsageSyncHostedService` 作为 `BackgroundService` 运行两个独立循环：
+DeepSeek 入库维度：`自然日 × API Key × 模型`（去重键含 `Model`）；`RequestCount` 存 `usage.REQUEST`。拉取窗口为「当前月往前第 2 个自然月的 1 日」至今日；大屏「本月」仍按当前自然月聚合。
 
-- **同步循环** — 按间隔调用上述 API 拉取数据，通过 `Timestamp + UserEmail` 去重 upsert；同步成功后立即推送 Toast 通知
-- **通知循环** — 按独立间隔推送定时用量提醒（作为补充）
+### 同步与通知
 
-同步流程：
-1. 拉取用量事件（POST，分页直至拉完）
-2. 拉取周期汇总（GET，容错）
-3. 并行拉取 5 个辅助 API（stripe/profile/billing-cycle/invoices/sessions）
-4. 检测 Cookie 过期时间，必要时发送预警消息
-5. 数据入库（period/subscription/userInfo）
-6. 按订阅周期和本周分别聚合统计
-7. 广播 `UsageDataFetchedMessage` 刷新 UI
-8. 推送同步成功通知
+`UsageSyncHostedService` 双循环：
 
-### Cookie 过期检测
+1. **同步循环** — 仅同步已启用且持有 token 的平台；成功后广播 `UsageDataFetchedMessage`，并按**通知开关**决定是否 Toast
+2. **通知循环** — 定时用量提醒；两边通知都关则跳过；只汇总已开通知的平台
 
-每次同步时调用 `/api/auth/sessions` 获取会话过期时间：
-- 已过期 → 红色预警条 + "Cookie 已失效，请在设置中更新"
-- 剩余 ≤7 天 → 黄色预警条 + "Cookie 将在 N 天后过期"
-- 预警条提供"打开浏览器"和"立即更新"按钮
+用户偏好文件（Token 显示格式、平台启用、通知开关、DeepSeek 大屏模式）持久化到本地 JSON，与 `appsettings.json` 分离。
 
 ### 安全存储
 
-凭证使用 Windows DPAPI（`ProtectedData.Protect`/`Unprotect`），以 `CurrentUser` 作用域加密写入 `%LOCALAPPDATA%/CursorUsageNotify/secrets.dat`，仅当前用户可解密。
-
-### 命名空间规范
-
-全解决方案统一使用 `Larpx.PersonalTools.CursorUsageNotify` 命名空间前缀，采用块级命名空间（`namespace Xxx { ... }`）而非文件级命名空间（`namespace Xxx;`）。
-
-## 构建验证
-
-```bash
-# 完整构建
-dotnet build
-
-# 运行测试
-dotnet test
-
-# 要求：0 错误、0 警告
-```
+| 平台 | 文件 |
+|---|---|
+| Cursor | `%LOCALAPPDATA%/CursorUsageNotify/secrets.dat` |
+| DeepSeek | `%LOCALAPPDATA%/CursorUsageNotify/secrets_deepseek.dat` |
 
 ## 配置
 
-`appsettings.json` 位于 GUI 项目根目录：
+`src/CursorUsageNotify.GUI/appsettings.json`：
 
 ```json
 {
@@ -293,7 +154,27 @@ dotnet test
 }
 ```
 
-用户可在设置界面动态修改拉取/通知间隔，无需重启。
+拉取/通知间隔与平台开关可在设置页修改；通知平台开关即时落盘。
+
+## 测试覆盖说明
+
+已覆盖（单元测试）：
+
+- 仓储 upsert 去重（含同日同 Key 多模型）、时间筛选、Clear
+- 聚合：`RequestCount` 求和、API Key 过滤、按 Key×模型分组、`GetDistinctApiKeys`
+- `UserPreferences` 加载/保存/通知开关/DeepSeek 过滤/坏 JSON 降级
+- Cursor HTTP 客户端、CSV 导出、DPAPI / SecureTokenHolder、端点探测
+
+暂未覆盖（偏集成/UI）：Avalonia ViewModel、DeepSeek 真实 HTTP（需账号）、托盘与 Toast 端到端。
+
+## 构建验证
+
+```bash
+dotnet build
+dotnet test
+```
+
+要求：0 错误（警告按项目配置处理）。
 
 ## 许可证
 

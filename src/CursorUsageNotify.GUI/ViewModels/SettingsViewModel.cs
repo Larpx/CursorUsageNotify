@@ -102,6 +102,8 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             // 从持久化偏好加载启用开关（默认 true）
             CursorEnabled = _userPrefs.IsPlatformEnabled(PlatformType.Cursor);
             DeepSeekEnabled = _userPrefs.IsPlatformEnabled(PlatformType.DeepSeek);
+            CursorNotificationEnabled = _userPrefs.IsNotificationEnabled(PlatformType.Cursor);
+            DeepSeekNotificationEnabled = _userPrefs.IsNotificationEnabled(PlatformType.DeepSeek);
 
             // DeepSeek 大屏模式
             _suppressDeepSeekModeNotify = true;
@@ -155,6 +157,18 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         /// </summary>
         [ObservableProperty]
         private bool _deepSeekEnabled = true;
+
+        /// <summary>
+        /// 是否推送 Cursor 用量通知。
+        /// </summary>
+        [ObservableProperty]
+        private bool _cursorNotificationEnabled = true;
+
+        /// <summary>
+        /// 是否推送 DeepSeek 用量通知。
+        /// </summary>
+        [ObservableProperty]
+        private bool _deepSeekNotificationEnabled = true;
 
         /// <summary>
         /// 一次性输入框：用户粘贴新 Cookie/Token 后提交，提交后立即清空。
@@ -478,9 +492,11 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             _settings.SyncIntervalMinutes = SyncIntervalMinutes;
             _settings.NotificationIntervalMinutes = NotificationIntervalMinutes;
 
-            // 持久化平台启用开关 + DeepSeek 大屏模式
+            // 持久化平台启用开关 + DeepSeek 大屏模式 + 通知开关
             _userPrefs.SetPlatformEnabled(PlatformType.Cursor, CursorEnabled);
             _userPrefs.SetPlatformEnabled(PlatformType.DeepSeek, DeepSeekEnabled);
+            _userPrefs.SetNotificationEnabled(PlatformType.Cursor, CursorNotificationEnabled);
+            _userPrefs.SetNotificationEnabled(PlatformType.DeepSeek, DeepSeekNotificationEnabled);
             PersistDeepSeekDashboardPrefs(notify: true);
             try
             {
@@ -678,6 +694,14 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                     break;
                 case nameof(DeepSeekEnabled):
                     _userPrefs.SetPlatformEnabled(PlatformType.DeepSeek, DeepSeekEnabled);
+                    break;
+                case nameof(CursorNotificationEnabled):
+                    _userPrefs.SetNotificationEnabled(PlatformType.Cursor, CursorNotificationEnabled);
+                    try { _userPrefs.Save(); } catch { /* 偏好保存失败不阻塞 UI */ }
+                    break;
+                case nameof(DeepSeekNotificationEnabled):
+                    _userPrefs.SetNotificationEnabled(PlatformType.DeepSeek, DeepSeekNotificationEnabled);
+                    try { _userPrefs.Save(); } catch { /* 偏好保存失败不阻塞 UI */ }
                     break;
                 case nameof(IsDeepSeekAllKeysMode):
                     if (_suppressDeepSeekModeNotify) break;

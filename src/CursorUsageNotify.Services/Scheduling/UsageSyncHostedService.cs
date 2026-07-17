@@ -321,6 +321,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
 
         /// <summary>
         /// 同步成功后推送通知，包含本次新增事件数和本周期/本周用量摘要。
+        /// 受设置页「平台通知开关」控制：关闭的平台不推送。
         /// </summary>
         private async Task NotifySyncSuccessAsync(
             PlatformType platform,
@@ -329,6 +330,11 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
             UsageAggregateStats? weeklyStats,
             CancellationToken ct)
         {
+            if (!_userPrefs.IsNotificationEnabled(platform))
+            {
+                return;
+            }
+
             try
             {
                 var periodSpend = periodStats?.TotalSpendCents / 100m ?? 0m;
@@ -337,11 +343,18 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
                 var weekTokens = weeklyStats?.TotalTokens ?? 0;
                 var mode = _options.TokenDisplayMode;
                 var currency = GetCurrencySymbol(platform);
+                var periodLabel = platform == PlatformType.DeepSeek ? "本月" : "本周期";
 
                 var title = $"{platform} 用量更新";
                 var body = $"新增 {newEventsCount} 条事件\n"
-                           + $"本周期：{TokenFormatter.Format(periodTokens, mode)} tokens，{currency}{periodSpend:F2}\n"
+                           + $"{periodLabel}：{TokenFormatter.Format(periodTokens, mode)} tokens，{currency}{periodSpend:F2}\n"
                            + $"本周：{TokenFormatter.Format(weekTokens, mode)} tokens，{currency}{weekSpend:F2}";
+
+                // DeepSeek 补充请求次数（period.UsedRequests / AggregateStats.TotalRequests）
+                if (platform == PlatformType.DeepSeek && periodStats is not null)
+                {
+                    body += $"\n请求：{periodStats.TotalRequests:N0} 次";
+                }
 
                 await _notification.ShowAsync(title, body, ct);
 
@@ -359,14 +372,20 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
         {
             try
             {
-                // 遍历所有启用且持有 token 的平台，汇总各平台本周期用量。
-                // 旧版本硬编码仅查询 Cursor，导致 DeepSeek 数据无法出现在定时提醒中。
+                // 两边通知都关：整次定时提醒跳过
+                if (!_userPrefs.HasAnyNotificationEnabled())
+                {
+                    return;
+                }
+
+                // 仅汇总「启用平台 + 开启通知 + 有 token」的用量
                 var lines = new List<string>();
-                var hasData = false;
 
                 foreach (var provider in _providers)
                 {
                     if (!_userPrefs.IsPlatformEnabled(provider.Platform))
+                        continue;
+                    if (!_userPrefs.IsNotificationEnabled(provider.Platform))
                         continue;
                     if (!_tokenHolder.HasToken(provider.Platform))
                         continue;
@@ -375,13 +394,20 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
                     if (period is null)
                         continue;
 
-                    hasData = true;
                     var currency = GetCurrencySymbol(provider.Platform);
                     var totalSpend = period.TotalSpendCents / 100m;
-                    lines.Add($"{provider.Platform}：{period.UsedTokens:N0} tokens，{currency}{totalSpend:F2}");
+                    if (provider.Platform == PlatformType.DeepSeek)
+                    {
+                        lines.Add(
+                            $"DeepSeek：{period.UsedTokens:N0} tokens，{currency}{totalSpend:F2}，{period.UsedRequests:N0} 次请求");
+                    }
+                    else
+                    {
+                        lines.Add($"{provider.Platform}：{period.UsedTokens:N0} tokens，{currency}{totalSpend:F2}");
+                    }
                 }
 
-                if (!hasData)
+                if (lines.Count == 0)
                     return;
 
                 var title = "用量提醒";

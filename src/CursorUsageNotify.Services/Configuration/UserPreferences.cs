@@ -30,6 +30,16 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Configuration
         };
 
         /// <summary>
+        /// 各平台是否推送用量通知（Toast / 定时提醒）。
+        /// 全部关闭则不发通知；打开谁就通知谁。
+        /// </summary>
+        public Dictionary<PlatformType, bool> NotificationEnabled { get; set; } = new()
+        {
+            [PlatformType.Cursor] = true,
+            [PlatformType.DeepSeek] = true
+        };
+
+        /// <summary>
         /// DeepSeek 数据大屏展示模式：全部 API Key 汇总 / 单个 API Key。
         /// </summary>
         public DeepSeekDashboardMode DeepSeekDashboardMode { get; set; } = DeepSeekDashboardMode.AllApiKeys;
@@ -73,6 +83,28 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Configuration
             => PlatformEnabled[platform] = enabled;
 
         /// <summary>
+        /// 检查指定平台是否启用用量通知。
+        /// </summary>
+        /// <param name="platform">平台类型。</param>
+        /// <returns>启用时返回 true；未配置时默认返回 true。</returns>
+        public bool IsNotificationEnabled(PlatformType platform)
+            => NotificationEnabled.TryGetValue(platform, out var enabled) ? enabled : true;
+
+        /// <summary>
+        /// 设置指定平台的通知开关。
+        /// </summary>
+        /// <param name="platform">平台类型。</param>
+        /// <param name="enabled">是否通知。</param>
+        public void SetNotificationEnabled(PlatformType platform, bool enabled)
+            => NotificationEnabled[platform] = enabled;
+
+        /// <summary>
+        /// 是否至少有一个平台开启了用量通知。
+        /// </summary>
+        public bool HasAnyNotificationEnabled()
+            => IsNotificationEnabled(PlatformType.Cursor) || IsNotificationEnabled(PlatformType.DeepSeek);
+
+        /// <summary>
         /// 解析当前 DeepSeek 大屏应使用的 API Key 过滤值。
         /// 全部 Key 模式返回 null；单 Key 模式返回选中 tracking_id。
         /// </summary>
@@ -102,6 +134,11 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Configuration
                         {
                             TokenDisplayMode = prefs.TokenDisplayMode,
                             PlatformEnabled = prefs.PlatformEnabled ?? new()
+                            {
+                                [PlatformType.Cursor] = true,
+                                [PlatformType.DeepSeek] = true
+                            },
+                            NotificationEnabled = prefs.NotificationEnabled ?? new()
                             {
                                 [PlatformType.Cursor] = true,
                                 [PlatformType.DeepSeek] = true

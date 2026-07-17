@@ -135,6 +135,18 @@
                                   SelectedItem="{Binding NotificationIntervalMinutes}"/>
                     </StackPanel>
 
+                    <StackPanel Orientation="Vertical" Spacing="6">
+                        <TextBlock Text="用量通知平台" FontSize="12" Foreground="#FF6B7280"/>
+                        <TextBlock Text="打开谁就推送谁的用量；全部关闭则不发通知。与上方「启用数据采集」独立。"
+                                   FontSize="11" Foreground="#FF9CA3AF" TextWrapping="Wrap"/>
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <CheckBox Content="Cursor 通知"
+                                      IsChecked="{Binding CursorNotificationEnabled, Mode=TwoWay}"/>
+                            <CheckBox Content="DeepSeek 通知"
+                                      IsChecked="{Binding DeepSeekNotificationEnabled, Mode=TwoWay}"/>
+                        </StackPanel>
+                    </StackPanel>
+
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <Button Content="保存设置" Command="{Binding SaveSettingsCommand}"/>
                         <Button Content="立即拉取一次"

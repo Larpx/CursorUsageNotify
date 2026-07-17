@@ -8,7 +8,8 @@ using Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels;
 namespace Larpx.PersonalTools.CursorUsageNotify.GUI
 {
     /// <summary>
-    /// Given a view model, returns the corresponding view if possible.
+    /// 按 ViewModel 类型约定解析对应 View（{Name}ViewModel → Views.{Name}View）。
+    /// Avalonia 默认 ViewLocator，依赖反射，裁剪发布时需注意。
     /// </summary>
     [RequiresUnreferencedCode(
         "Default implementation of ViewLocator involves reflection which may be trimmed away.",
