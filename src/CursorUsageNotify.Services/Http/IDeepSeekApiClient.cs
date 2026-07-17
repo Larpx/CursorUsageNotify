@@ -7,7 +7,6 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
     /// <summary>
     /// DeepSeek 开放平台 API 客户端抽象。
     /// 认证方式：Authorization: Bearer {userToken}（token 来自 localStorage userToken.value）。
-    /// 端点结构基于 2026-07 Playwright 抓包验证。
     /// </summary>
     public interface IDeepSeekApiClient
     {
@@ -20,7 +19,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
         Task<Result<int>> TestConnectionAsync(string userToken, CancellationToken ct = default);
 
         /// <summary>
-        /// 获取用户账户汇总（余额、本月用量、本月费用）。
+        /// 获取用户账户汇总（充值余额、累计消费、本月消费）。
         /// GET /api/v0/users/get_user_summary
         /// </summary>
         /// <param name="userToken">DeepSeek userToken。</param>
@@ -28,7 +27,15 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
         Task<DeepSeekUserSummaryDto> GetUserSummaryAsync(string userToken, CancellationToken ct = default);
 
         /// <summary>
-        /// 获取按 API Key 分组的每日 token 用量。
+        /// 获取当前登录用户信息（邮箱、手机号、资料）。
+        /// GET /auth-api/v0/users/current
+        /// </summary>
+        /// <param name="userToken">DeepSeek userToken。</param>
+        /// <param name="ct">取消令牌。</param>
+        Task<DeepSeekCurrentUserDto> GetCurrentUserAsync(string userToken, CancellationToken ct = default);
+
+        /// <summary>
+        /// 获取按 API Key 分组的每日 token 用量（含各模型 REQUEST/Token）。
         /// GET /api/v0/usage/by_api_key/amount?start={sec}&amp;end={sec}&amp;tz=0
         /// </summary>
         /// <param name="userToken">DeepSeek userToken。</param>
@@ -48,7 +55,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
         Task<DeepSeekUsageCostDto> GetUsageCostAsync(string userToken, long startSec, long endSec, CancellationToken ct = default);
 
         /// <summary>
-        /// 获取 API Key 列表（用于推断用户标识）。
+        /// 获取账户下 API Key 列表（可多个，各自独立统计；不是用户信息）。
         /// GET /api/v0/users/get_api_keys
         /// </summary>
         /// <param name="userToken">DeepSeek userToken。</param>

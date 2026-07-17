@@ -30,9 +30,14 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         public bool HasCacheWrite { get; init; } = true;
 
         /// <summary>
-        /// 是否显示订阅周期/状态（仅 Cursor 有 Stripe 订阅，DeepSeek 按自然月统计）。
+        /// 是否显示订阅周期/状态（仅 Cursor 有 Stripe 订阅）。
         /// </summary>
         public bool HasSubscription { get; init; } = true;
+
+        /// <summary>
+        /// 是否显示账户摘要（余额/累计消费/总请求，DeepSeek 使用）。
+        /// </summary>
+        public bool HasAccountSummary { get; init; }
 
         /// <summary>
         /// 货币符号（Cursor: $，DeepSeek: ¥）。
@@ -68,7 +73,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         private string _planName = "-";
 
         /// <summary>
-        /// 订阅周期文本（Cursor 起止日期；DeepSeek 本月范围）。
+        /// 订阅周期文本（Cursor 起止日期）。
         /// </summary>
         [ObservableProperty]
         private string _periodRange = "-";
@@ -78,6 +83,30 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         /// </summary>
         [ObservableProperty]
         private string _subStatus = "-";
+
+        /// <summary>
+        /// 账户充值余额（DeepSeek，元）。
+        /// </summary>
+        [ObservableProperty]
+        private decimal _accountBalance;
+
+        /// <summary>
+        /// 累计消费金额（DeepSeek，元）。
+        /// </summary>
+        [ObservableProperty]
+        private decimal _cumulativeSpend;
+
+        /// <summary>
+        /// 总请求次数（DeepSeek 为本月 REQUEST 合计）。
+        /// </summary>
+        [ObservableProperty]
+        private long _totalRequestCount;
+
+        /// <summary>
+        /// 按 API Key × 模型的用量明细（hover 展示）。
+        /// </summary>
+        [ObservableProperty]
+        private string _usageBreakdownTooltip = string.Empty;
 
         // ──────────────────────────────────────────────────────────────
         // 当天用量

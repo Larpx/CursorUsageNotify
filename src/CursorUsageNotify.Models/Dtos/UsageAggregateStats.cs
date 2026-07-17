@@ -12,7 +12,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
         public long TotalTokens { get; set; }
 
         /// <summary>
-        /// 总请求数（事件行数）。
+        /// 总请求数（Cursor=事件行数；DeepSeek=usage.REQUEST 累计）。
         /// </summary>
         public int TotalRequests { get; set; }
 

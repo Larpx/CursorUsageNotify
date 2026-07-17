@@ -94,9 +94,14 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Core
         public const string DeepSeekUsageCostPath = "/api/v0/usage/by_api_key/cost";
 
         /// <summary>
-        /// DeepSeek API Key 列表端点（用于推断用户标识）。
+        /// DeepSeek API Key 列表端点（账户下可配置多个 Key，各自独立统计用量）。
         /// </summary>
         public const string DeepSeekApiKeysPath = "/api/v0/users/get_api_keys";
+
+        /// <summary>
+        /// DeepSeek 当前登录用户信息端点（邮箱、手机号、头像/名称等）。
+        /// </summary>
+        public const string DeepSeekCurrentUserPath = "/auth-api/v0/users/current";
 
         /// <summary>
         /// DeepSeek API 请求 User-Agent（模拟 Edge 浏览器）。

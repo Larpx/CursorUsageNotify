@@ -71,6 +71,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 PlatformName = "DeepSeek",
                 HasCacheWrite = false,
                 HasSubscription = false,
+                HasAccountSummary = true,
                 CurrencySymbol = "¥",
                 IsEnabled = userPrefs.IsPlatformEnabled(PlatformType.DeepSeek)
             };
@@ -81,6 +82,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             Messenger.Register<CookieExpiringSoonMessage>(this, OnCookieExpiring);
             Messenger.Register<EndpointDegradedMessage>(this, OnEndpointDegraded);
             Messenger.Register<TokenStorageUnavailableMessage>(this, OnTokenStorageUnavailable);
+            Messenger.Register<UserPreferencesChangedMessage>(this, (_, m) => _ = LoadPlatformAsync(null, m.Platform));
             _ = LoadAllAsync();
         }
 
@@ -295,19 +297,25 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             // 同步可见性与启用开关
             dashboard.IsEnabled = _userPrefs.IsPlatformEnabled(platform);
 
+            // DeepSeek 可按设置过滤单个 API Key；Cursor 不过滤
+            var apiKeyFilter = platform == PlatformType.DeepSeek
+                ? _userPrefs.GetDeepSeekApiKeyFilter()
+                : null;
+
             var period = msg?.LatestPeriod ?? await _repository.GetLatestPeriodUsageAsync(platform);
             var user = msg?.LatestUser ?? await _repository.GetLatestUserInfoAsync(platform);
             var sub = msg?.LatestSubscription ?? await _repository.GetLatestSubscriptionAsync(platform);
             var agg = msg?.AggregateStats;
 
-            // 如果消息中没有聚合数据，尝试按当前周期自行查询
-            if (agg is null)
+            var periodStart = sub?.CurrentPeriodStart ?? period?.PeriodStart ?? 0;
+            var periodEnd = sub?.CurrentPeriodEnd ?? period?.PeriodEnd ?? 0;
+
+            // 消息聚合未按当前过滤条件时，按库重算（设置切换后必须重算）
+            if (agg is null || platform == PlatformType.DeepSeek)
             {
-                var aggStart = sub?.CurrentPeriodStart ?? period?.PeriodStart ?? 0;
-                var aggEnd = sub?.CurrentPeriodEnd ?? period?.PeriodEnd ?? 0;
-                if (aggStart > 0 && aggEnd > 0)
+                if (periodStart > 0 && periodEnd > 0)
                 {
-                    agg = await _repository.AggregateStatsAsync(aggStart, aggEnd, platform);
+                    agg = await _repository.AggregateStatsAsync(periodStart, periodEnd, platform, apiKeyFilter);
                 }
             }
 
@@ -330,17 +338,23 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                               : "-";
             dashboard.PlanName = resolvedPlan ?? "-";
 
-            // 周期范围
-            var periodStart = sub?.CurrentPeriodStart ?? period?.PeriodStart ?? 0;
-            var periodEnd = sub?.CurrentPeriodEnd ?? period?.PeriodEnd ?? 0;
-            if (periodStart > 0 && periodEnd > 0)
+            // Cursor：显示订阅周期；DeepSeek：显示余额/累计消费/总请求
+            if (dashboard.HasSubscription && periodStart > 0 && periodEnd > 0)
             {
                 var start = DateTimeOffset.FromUnixTimeMilliseconds(periodStart).LocalDateTime;
                 var end = DateTimeOffset.FromUnixTimeMilliseconds(periodEnd).LocalDateTime;
                 dashboard.PeriodRange = $"{start:yyyy-MM-dd} ~ {end:yyyy-MM-dd}";
             }
 
-            // 本周期用量（Cursor=订阅周期，DeepSeek=本月）
+            if (dashboard.HasAccountSummary && period is not null)
+            {
+                // RemainingRequests=余额（分）；FastPremiumRequests=累计消费（分）
+                dashboard.AccountBalance = period.RemainingRequests / 100m;
+                dashboard.CumulativeSpend = period.FastPremiumRequests / 100m;
+                dashboard.TotalRequestCount = agg?.TotalRequests ?? period.UsedRequests;
+            }
+
+            // 本周期/本月用量
             if (agg is not null)
             {
                 dashboard.PeriodInputTokens = agg.TotalInputTokens;
@@ -350,6 +364,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 dashboard.PeriodSpend = agg.TotalSpendCents / 100m;
                 dashboard.PeriodTotalTokens = agg.TotalInputTokens + agg.TotalOutputTokens
                                     + agg.TotalCacheReadTokens + agg.TotalCacheWriteTokens;
+                if (dashboard.HasAccountSummary)
+                {
+                    dashboard.TotalRequestCount = agg.TotalRequests;
+                }
             }
             else if (period is not null)
             {
@@ -359,11 +377,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             }
 
             // 本周用量
-            var weekly = msg?.WeeklyAggregateStats;
-            if (weekly is null)
-            {
-                weekly = await _repository.AggregateWeeklyStatsAsync(platform);
-            }
+            var weekly = (msg?.WeeklyAggregateStats is not null && platform != PlatformType.DeepSeek)
+                ? msg.WeeklyAggregateStats
+                : await _repository.AggregateWeeklyStatsAsync(platform, apiKeyFilter);
             if (weekly is not null)
             {
                 dashboard.WeekInputTokens = weekly.TotalInputTokens;
@@ -375,8 +391,8 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                                   + weekly.TotalCacheReadTokens + weekly.TotalCacheWriteTokens;
             }
 
-            // 当天用量（始终从仓储查询，消息不带当天统计）
-            var daily = await _repository.AggregateDailyStatsAsync(platform);
+            // 当天用量
+            var daily = await _repository.AggregateDailyStatsAsync(platform, apiKeyFilter);
             if (daily is not null)
             {
                 dashboard.TodayInputTokens = daily.TotalInputTokens;
@@ -386,6 +402,14 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 dashboard.TodaySpend = daily.TotalSpendCents / 100m;
                 dashboard.TodayTotalTokens = daily.TotalInputTokens + daily.TotalOutputTokens
                                   + daily.TotalCacheReadTokens + daily.TotalCacheWriteTokens;
+            }
+
+            // DeepSeek hover：按 API Key × 模型展示本自然月明细
+            if (dashboard.HasAccountSummary && periodStart > 0 && periodEnd > 0)
+            {
+                var breakdown = await _repository.AggregateByApiKeyAndModelAsync(
+                    periodStart, periodEnd, platform, apiKeyFilter);
+                dashboard.UsageBreakdownTooltip = FormatDeepSeekBreakdownTooltip(breakdown);
             }
 
             // 订阅状态（仅 Cursor 有意义）
@@ -413,6 +437,34 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             }
 
             UpdateGlobalStatus();
+        }
+
+        /// <summary>
+        /// 格式化 DeepSeek 按 API Key × 模型的自然月用量明细（用于 ToolTip）。
+        /// </summary>
+        private static string FormatDeepSeekBreakdownTooltip(IReadOnlyList<ApiKeyModelUsageBreakdown> items)
+        {
+            if (items.Count == 0)
+            {
+                return "本月暂无按 Key/模型明细";
+            }
+
+            var lines = new List<string> { "本月用量明细（按 API Key × 模型）" };
+            string? currentKey = null;
+            foreach (var item in items)
+            {
+                if (currentKey != item.ApiKeyName)
+                {
+                    currentKey = item.ApiKeyName;
+                    lines.Add($"【{item.ApiKeyName}】");
+                }
+
+                var spend = item.SpendCents / 100m;
+                lines.Add(
+                    $"  {item.Model}: {item.TotalTokens:N0} tokens, {item.RequestCount:N0} 次, ¥{spend:F2}");
+            }
+
+            return string.Join("\n", lines);
         }
 
         /// <summary>

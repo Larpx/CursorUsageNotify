@@ -89,6 +89,32 @@
                     <TextBlock Text="{Binding DeepSeekTestResult}"
                                FontSize="13"
                                Foreground="{Binding DeepSeekTestSuccess, Converter={StaticResource SuccessToColor}}"/>
+
+                    <!-- DeepSeek 大屏展示模式 -->
+                    <Border BorderBrush="#FFE5E7EB" BorderThickness="1" CornerRadius="6" Padding="12" Background="#FFF9FAFB">
+                        <StackPanel Orientation="Vertical" Spacing="8">
+                            <TextBlock Text="数据大屏展示模式" FontSize="13" FontWeight="SemiBold"/>
+                            <TextBlock Text="选择大屏汇总全部 API Key，或仅显示单个 API Key 的用量（设置会持久化）。"
+                                       FontSize="11" Foreground="#FF9CA3AF" TextWrapping="Wrap"/>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <RadioButton Content="全部 API Key"
+                                             IsChecked="{Binding IsDeepSeekAllKeysMode, Mode=TwoWay}"
+                                             GroupName="DeepSeekDashboardMode"/>
+                                <RadioButton Content="单个 API Key"
+                                             IsChecked="{Binding IsDeepSeekSingleKeyMode, Mode=TwoWay}"
+                                             GroupName="DeepSeekDashboardMode"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Vertical" Spacing="4"
+                                        IsVisible="{Binding IsDeepSeekSingleKeyMode}">
+                                <TextBlock Text="选择 API Key" FontSize="12" Foreground="#FF6B7280"/>
+                                <ComboBox ItemsSource="{Binding DeepSeekApiKeyOptions}"
+                                          SelectedItem="{Binding SelectedDeepSeekApiKey}"
+                                          MinWidth="280"/>
+                                <TextBlock Text="列表来自账户 get_api_keys；需已保存 userToken。"
+                                           FontSize="11" Foreground="#FF9CA3AF"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Border>
 

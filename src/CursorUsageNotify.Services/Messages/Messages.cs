@@ -132,4 +132,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Messages
     /// 新的显示格式。
     /// </param>
     public sealed record TokenFormatChangedMessage(TokenDisplayMode Mode);
+
+    /// <summary>
+    /// 用户偏好变更（如 DeepSeek 大屏展示模式），订阅者应重新加载对应平台大屏。
+    /// </summary>
+    /// <param name="Platform">
+    /// 受影响的平台。
+    /// </param>
+    public sealed record UserPreferencesChangedMessage(PlatformType Platform);
 }

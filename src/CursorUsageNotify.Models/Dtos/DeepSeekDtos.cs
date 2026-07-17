@@ -63,7 +63,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
 
     /// <summary>
     /// 用户账户汇总 DTO，对应 /api/v0/users/get_user_summary 响应。
-    /// 包含本月用量、账户余额、总费用等信息。
+    /// normal_wallets.balance=充值余额；total_costs.amount=累计消费；monthly_costs.amount=本月消费。
     /// </summary>
     public sealed class DeepSeekUserSummaryDto
     {
@@ -91,7 +91,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
         public long? TotalUsage { get; set; }
 
         /// <summary>
-        /// 正常充值钱包列表。
+        /// 正常充值钱包列表（balance 为当前账户充值余额）。
         /// </summary>
         [JsonPropertyName("normal_wallets")]
         public List<DeepSeekWalletDto>? NormalWallets { get; set; }
@@ -111,7 +111,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
         public long? TotalAvailableTokenEstimation { get; set; }
 
         /// <summary>
-        /// 本月费用列表（按币种）。
+        /// 本月消费列表（按币种，amount 为本月消费金额）。
         /// </summary>
         [JsonPropertyName("monthly_costs")]
         public List<DeepSeekCostDto>? MonthlyCosts { get; set; }
@@ -124,10 +124,58 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
         public long? MonthlyTokenUsage { get; set; }
 
         /// <summary>
-        /// 总费用列表（按币种）。
+        /// 累计消费列表（按币种，amount 为账户累计消费金额）。
         /// </summary>
         [JsonPropertyName("total_costs")]
         public List<DeepSeekCostDto>? TotalCosts { get; set; }
+    }
+
+    /// <summary>
+    /// 当前登录用户 DTO，对应 /auth-api/v0/users/current 响应。
+    /// </summary>
+    public sealed class DeepSeekCurrentUserDto
+    {
+        /// <summary>
+        /// 用户邮箱。
+        /// </summary>
+        [JsonPropertyName("email")]
+        public string? Email { get; set; }
+
+        /// <summary>
+        /// 手机号。
+        /// </summary>
+        [JsonPropertyName("mobile_number")]
+        public string? MobileNumber { get; set; }
+
+        /// <summary>
+        /// 用户资料（头像、名称、地区等）。
+        /// </summary>
+        [JsonPropertyName("id_profile")]
+        public DeepSeekIdProfileDto? IdProfile { get; set; }
+    }
+
+    /// <summary>
+    /// DeepSeek 用户资料。
+    /// </summary>
+    public sealed class DeepSeekIdProfileDto
+    {
+        /// <summary>
+        /// 显示名称。
+        /// </summary>
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
+
+        /// <summary>
+        /// 头像 URL。
+        /// </summary>
+        [JsonPropertyName("avatar")]
+        public string? Avatar { get; set; }
+
+        /// <summary>
+        /// 地区。
+        /// </summary>
+        [JsonPropertyName("region")]
+        public string? Region { get; set; }
     }
 
     /// <summary>
@@ -418,7 +466,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Dtos
 
     /// <summary>
     /// API Key 列表 DTO，对应 /api/v0/users/get_api_keys 响应。
-    /// 用于推断用户标识（API Key 名称）。
+    /// DeepSeek 可配置多个 API Key，各自独立统计用量；此接口不是用户信息。
     /// </summary>
     public sealed class DeepSeekApiKeysDto
     {

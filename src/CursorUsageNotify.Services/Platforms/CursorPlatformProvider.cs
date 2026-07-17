@@ -207,6 +207,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
                 Kind = dto.Kind,
                 MaxMode = dto.MaxMode,
                 RequestsCosts = dto.RequestsCosts,
+                RequestCount = 1,
                 IsTokenBasedCall = dto.IsTokenBasedCall,
                 IsChargeable = dto.IsChargeable,
                 IsHeadless = dto.IsHeadless,

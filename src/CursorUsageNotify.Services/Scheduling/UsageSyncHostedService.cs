@@ -278,7 +278,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
             }
 
             // 只有 Cursor 平台使用 LastSyncTimeMs 做增量同步
-            // DeepSeek 每次拉取本月全量数据，不需要增量时间戳
+            // DeepSeek 每次拉取「往前两个自然月」全量窗口，不需要增量时间戳
             if (provider.Platform == PlatformType.Cursor)
             {
                 _options.LastSyncTimeMs = nowMs;
@@ -297,11 +297,16 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Scheduling
                                ?? latestPeriod?.PeriodEnd
                                ?? 0;
 
-            var aggStats = aggPeriodStart > 0 && aggPeriodEnd > 0
-                ? await _repository.AggregateStatsAsync(aggPeriodStart, aggPeriodEnd, provider.Platform, ct)
+            // DeepSeek 可按设置过滤单个 API Key；Cursor 不过滤
+            var apiKeyFilter = provider.Platform == PlatformType.DeepSeek
+                ? _userPrefs.GetDeepSeekApiKeyFilter()
                 : null;
 
-            var weeklyStats = await _repository.AggregateWeeklyStatsAsync(provider.Platform, ct);
+            var aggStats = aggPeriodStart > 0 && aggPeriodEnd > 0
+                ? await _repository.AggregateStatsAsync(aggPeriodStart, aggPeriodEnd, provider.Platform, apiKeyFilter, ct)
+                : null;
+
+            var weeklyStats = await _repository.AggregateWeeklyStatsAsync(provider.Platform, apiKeyFilter, ct);
 
             _messenger.Send(new UsageDataFetchedMessage(
                 inserted, latestPeriod, latestUser, latestSub, aggStats, weeklyStats, nowMs, provider.Platform));

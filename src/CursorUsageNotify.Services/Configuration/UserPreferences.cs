@@ -30,6 +30,16 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Configuration
         };
 
         /// <summary>
+        /// DeepSeek 数据大屏展示模式：全部 API Key 汇总 / 单个 API Key。
+        /// </summary>
+        public DeepSeekDashboardMode DeepSeekDashboardMode { get; set; } = DeepSeekDashboardMode.AllApiKeys;
+
+        /// <summary>
+        /// 单 Key 模式下选中的 API Key tracking_id（或名称回退值）。
+        /// </summary>
+        public string? DeepSeekSelectedApiKeyId { get; set; }
+
+        /// <summary>
         /// 创建默认偏好实例。
         /// </summary>
         public UserPreferences()
@@ -63,6 +73,16 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Configuration
             => PlatformEnabled[platform] = enabled;
 
         /// <summary>
+        /// 解析当前 DeepSeek 大屏应使用的 API Key 过滤值。
+        /// 全部 Key 模式返回 null；单 Key 模式返回选中 tracking_id。
+        /// </summary>
+        public string? GetDeepSeekApiKeyFilter()
+            => DeepSeekDashboardMode == DeepSeekDashboardMode.SingleApiKey
+                && !string.IsNullOrWhiteSpace(DeepSeekSelectedApiKeyId)
+                ? DeepSeekSelectedApiKeyId
+                : null;
+
+        /// <summary>
         /// 从文件加载用户偏好。文件不存在时返回默认值。
         /// </summary>
         /// <param name="filePath">偏好文件路径。</param>
@@ -85,7 +105,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Configuration
                             {
                                 [PlatformType.Cursor] = true,
                                 [PlatformType.DeepSeek] = true
-                            }
+                            },
+                            DeepSeekDashboardMode = prefs.DeepSeekDashboardMode,
+                            DeepSeekSelectedApiKeyId = prefs.DeepSeekSelectedApiKeyId
                         };
                     }
                 }

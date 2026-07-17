@@ -43,17 +43,33 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Tests.Services
         }
 
         [Fact]
-        public async Task UpsertUsageEventsAsync_DuplicateTimestampUpsert_DoesNotInsertDuplicate()
+        public async Task UpsertUsageEventsAsync_SameKeyDifferentModel_InsertsBoth()
+        {
+            // DeepSeek：同日同 Key 不同模型需分存，不能互相覆盖
+            var first = CreateEvent(1000, "key-a", "model-a");
+            var otherModel = CreateEvent(1000, "key-a", "model-b");
+
+            await _repository.UpsertUsageEventsAsync(new[] { first });
+            await _repository.UpsertUsageEventsAsync(new[] { otherModel });
+
+            var all = await _repository.QueryEventsPagedAsync(pageSize: 100);
+            Assert.Equal(2, all.Items.Count);
+        }
+
+        [Fact]
+        public async Task UpsertUsageEventsAsync_DuplicateSameModel_Upserts()
         {
             var first = CreateEvent(1000, "a@x.com", "model-a");
-            var duplicate = CreateEvent(1000, "a@x.com", "model-b"); // 同 timestamp + email
+            first.InputTokens = 10;
+            var duplicate = CreateEvent(1000, "a@x.com", "model-a");
+            duplicate.InputTokens = 99;
 
             await _repository.UpsertUsageEventsAsync(new[] { first });
             await _repository.UpsertUsageEventsAsync(new[] { duplicate });
 
             var all = await _repository.QueryEventsPagedAsync(pageSize: 100);
             Assert.Single(all.Items);
-            Assert.Equal("model-b", all.Items[0].Model); // 被更新为新值
+            Assert.Equal(99, all.Items[0].InputTokens);
         }
 
         [Fact]

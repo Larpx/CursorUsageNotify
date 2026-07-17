@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
@@ -102,6 +103,12 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             CursorEnabled = _userPrefs.IsPlatformEnabled(PlatformType.Cursor);
             DeepSeekEnabled = _userPrefs.IsPlatformEnabled(PlatformType.DeepSeek);
 
+            // DeepSeek 大屏模式
+            _suppressDeepSeekModeNotify = true;
+            IsDeepSeekAllKeysMode = _userPrefs.DeepSeekDashboardMode != DeepSeekDashboardMode.SingleApiKey;
+            IsDeepSeekSingleKeyMode = !IsDeepSeekAllKeysMode;
+            _suppressDeepSeekModeNotify = false;
+
             PropertyChanged += OnSettingsPropertyChanged;
 
             // 订阅后台 token 状态变化（加载/清除/过期），刷新对应平台状态
@@ -117,10 +124,25 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 }
             });
 
+            // 同步成功后刷新 API Key 下拉列表
+            Messenger.Register<UsageDataFetchedMessage>(this, (_, m) =>
+            {
+                if (m.Platform == PlatformType.DeepSeek)
+                {
+                    _ = LoadDeepSeekApiKeyOptionsAsync();
+                }
+            });
+
             // 初始刷新一次（后台加载早于本构造时由消息驱动；晚于时本次读取）
             RefreshTokenStatus();
             RefreshDeepSeekTokenStatus();
+            _ = LoadDeepSeekApiKeyOptionsAsync();
         }
+
+        /// <summary>
+        /// 加载 DeepSeek 大屏模式时抑制 PropertyChanged 副作用。
+        /// </summary>
+        private bool _suppressDeepSeekModeNotify;
 
         /// <summary>
         /// 是否启用 Cursor 平台数据采集（关闭后不刷新，但保留历史数据）。
@@ -189,6 +211,29 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
         /// </summary>
         [ObservableProperty]
         private bool _isDeepSeekTesting;
+
+        /// <summary>
+        /// DeepSeek 大屏：显示全部 API Key 汇总。
+        /// </summary>
+        [ObservableProperty]
+        private bool _isDeepSeekAllKeysMode = true;
+
+        /// <summary>
+        /// DeepSeek 大屏：仅显示单个 API Key。
+        /// </summary>
+        [ObservableProperty]
+        private bool _isDeepSeekSingleKeyMode;
+
+        /// <summary>
+        /// DeepSeek API Key 下拉选项。
+        /// </summary>
+        public ObservableCollection<DeepSeekApiKeyOption> DeepSeekApiKeyOptions { get; } = new();
+
+        /// <summary>
+        /// 当前选中的 DeepSeek API Key（单 Key 模式）。
+        /// </summary>
+        [ObservableProperty]
+        private DeepSeekApiKeyOption? _selectedDeepSeekApiKey;
 
         /// <summary>
         /// 从用户输入的原始字符串中提取 WorkosCursorSessionToken 值。
@@ -394,6 +439,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                     DeepSeekTestSuccess = true;
                     DeepSeekTestResult = $"连接成功，账户事件数：{result.Value}";
                     await SaveTokenForPlatformAsync(PlatformType.DeepSeek);
+                    await LoadDeepSeekApiKeyOptionsAsync();
                 }
                 else
                 {
@@ -432,9 +478,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
             _settings.SyncIntervalMinutes = SyncIntervalMinutes;
             _settings.NotificationIntervalMinutes = NotificationIntervalMinutes;
 
-            // 持久化平台启用开关
+            // 持久化平台启用开关 + DeepSeek 大屏模式
             _userPrefs.SetPlatformEnabled(PlatformType.Cursor, CursorEnabled);
             _userPrefs.SetPlatformEnabled(PlatformType.DeepSeek, DeepSeekEnabled);
+            PersistDeepSeekDashboardPrefs(notify: true);
             try
             {
                 _userPrefs.Save();
@@ -632,6 +679,112 @@ namespace Larpx.PersonalTools.CursorUsageNotify.GUI.ViewModels
                 case nameof(DeepSeekEnabled):
                     _userPrefs.SetPlatformEnabled(PlatformType.DeepSeek, DeepSeekEnabled);
                     break;
+                case nameof(IsDeepSeekAllKeysMode):
+                    if (_suppressDeepSeekModeNotify) break;
+                    if (IsDeepSeekAllKeysMode)
+                    {
+                        _suppressDeepSeekModeNotify = true;
+                        IsDeepSeekSingleKeyMode = false;
+                        _suppressDeepSeekModeNotify = false;
+                        PersistDeepSeekDashboardPrefs(notify: true);
+                    }
+                    break;
+                case nameof(IsDeepSeekSingleKeyMode):
+                    if (_suppressDeepSeekModeNotify) break;
+                    if (IsDeepSeekSingleKeyMode)
+                    {
+                        _suppressDeepSeekModeNotify = true;
+                        IsDeepSeekAllKeysMode = false;
+                        _suppressDeepSeekModeNotify = false;
+                        PersistDeepSeekDashboardPrefs(notify: true);
+                    }
+                    break;
+                case nameof(SelectedDeepSeekApiKey):
+                    if (_suppressDeepSeekModeNotify) break;
+                    PersistDeepSeekDashboardPrefs(notify: true);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// 从 get_api_keys 加载本账户当前全部 API Key；无 token 时回退到本地用量库。
+        /// </summary>
+        private async Task LoadDeepSeekApiKeyOptionsAsync()
+        {
+            try
+            {
+                IReadOnlyList<(string TrackingId, string Name)> keys;
+
+                if (_tokenHolder.HasToken(PlatformType.DeepSeek))
+                {
+                    // 设置页应展示账户当前全部 Key，不以用量库出现过的为准
+                    var dto = await _tokenHolder.UseAsync(
+                        PlatformType.DeepSeek,
+                        (t, ct) => _deepSeekClient.GetApiKeysAsync(t, ct),
+                        default);
+
+                    keys = (dto.ApiKeys ?? [])
+                        .Select(k =>
+                        {
+                            var trackingId = k.TrackingId ?? k.SensitiveId ?? k.Name ?? string.Empty;
+                            var name = k.Name ?? k.SensitiveId ?? trackingId;
+                            return (TrackingId: trackingId, Name: name);
+                        })
+                        .Where(k => !string.IsNullOrEmpty(k.TrackingId))
+                        .OrderBy(k => k.Name)
+                        .ToList();
+                }
+                else
+                {
+                    keys = await _repository.GetDistinctApiKeysAsync(PlatformType.DeepSeek);
+                }
+
+                _suppressDeepSeekModeNotify = true;
+                DeepSeekApiKeyOptions.Clear();
+                foreach (var (trackingId, name) in keys)
+                {
+                    DeepSeekApiKeyOptions.Add(new DeepSeekApiKeyOption
+                    {
+                        TrackingId = trackingId,
+                        Name = name
+                    });
+                }
+
+                var selectedId = _userPrefs.DeepSeekSelectedApiKeyId;
+                SelectedDeepSeekApiKey = DeepSeekApiKeyOptions
+                    .FirstOrDefault(k => k.TrackingId == selectedId || k.Name == selectedId)
+                    ?? DeepSeekApiKeyOptions.FirstOrDefault();
+                _suppressDeepSeekModeNotify = false;
+            }
+            catch
+            {
+                _suppressDeepSeekModeNotify = false;
+            }
+        }
+
+        /// <summary>
+        /// 将 DeepSeek 大屏模式写入偏好并可选通知大屏刷新。
+        /// </summary>
+        private void PersistDeepSeekDashboardPrefs(bool notify)
+        {
+            _userPrefs.DeepSeekDashboardMode = IsDeepSeekSingleKeyMode
+                ? DeepSeekDashboardMode.SingleApiKey
+                : DeepSeekDashboardMode.AllApiKeys;
+            _userPrefs.DeepSeekSelectedApiKeyId = SelectedDeepSeekApiKey?.TrackingId
+                                                 ?? SelectedDeepSeekApiKey?.Name;
+
+            try
+            {
+                _userPrefs.Save();
+            }
+            catch
+            {
+                // 偏好保存失败不阻塞 UI
+            }
+
+            if (notify)
+            {
+                Messenger.Send(new UserPreferencesChangedMessage(PlatformType.DeepSeek));
             }
         }
 

@@ -13,7 +13,8 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
     public interface IUsageRepository
     {
         /// <summary>
-        /// 批量 upsert 用量事件（按 Timestamp + UserEmail + Platform 去重）。
+        /// 批量 upsert 用量事件（按 Timestamp + UserEmail + Platform + Model 去重，
+        /// 以支持 DeepSeek 同日同 Key 多模型分存）。
         /// </summary>
         Task<int> UpsertUsageEventsAsync(IEnumerable<UsageEventEntity> events, CancellationToken ct = default);
 
@@ -123,12 +124,16 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
         /// <param name="platform">
         /// 平台类型（默认 Cursor 向后兼容）。
         /// </param>
+        /// <param name="apiKeyFilter">
+        /// DeepSeek API Key 过滤（匹配 Kind/tracking_id 或 UserEmail/名称）；null 表示不过滤。
+        /// </param>
         /// <param name="ct">
         /// 取消令牌。
         /// </param>
         Task<UsageAggregateStats> AggregateStatsAsync(
             long periodStart, long periodEnd,
             PlatformType platform = PlatformType.Cursor,
+            string? apiKeyFilter = null,
             CancellationToken ct = default);
 
         /// <summary>
@@ -137,10 +142,16 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
         /// <param name="platform">
         /// 平台类型（默认 Cursor 向后兼容）。
         /// </param>
+        /// <param name="apiKeyFilter">
+        /// DeepSeek API Key 过滤；null 表示不过滤。
+        /// </param>
         /// <param name="ct">
         /// 取消令牌。
         /// </param>
-        Task<UsageAggregateStats> AggregateWeeklyStatsAsync(PlatformType platform = PlatformType.Cursor, CancellationToken ct = default);
+        Task<UsageAggregateStats> AggregateWeeklyStatsAsync(
+            PlatformType platform = PlatformType.Cursor,
+            string? apiKeyFilter = null,
+            CancellationToken ct = default);
 
         /// <summary>
         /// 聚合指定平台当天（本地 00:00 至今）的用量统计数据。
@@ -148,10 +159,39 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
         /// <param name="platform">
         /// 平台类型（默认 Cursor 向后兼容）。
         /// </param>
+        /// <param name="apiKeyFilter">
+        /// DeepSeek API Key 过滤；null 表示不过滤。
+        /// </param>
         /// <param name="ct">
         /// 取消令牌。
         /// </param>
-        Task<UsageAggregateStats> AggregateDailyStatsAsync(PlatformType platform = PlatformType.Cursor, CancellationToken ct = default);
+        Task<UsageAggregateStats> AggregateDailyStatsAsync(
+            PlatformType platform = PlatformType.Cursor,
+            string? apiKeyFilter = null,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// 按 API Key × 模型聚合指定时间范围内的用量明细（DeepSeek 大屏 hover）。
+        /// </summary>
+        /// <param name="periodStart">起始时间（epoch 毫秒）。</param>
+        /// <param name="periodEnd">结束时间（epoch 毫秒）。</param>
+        /// <param name="platform">平台类型。</param>
+        /// <param name="apiKeyFilter">可选 API Key 过滤。</param>
+        /// <param name="ct">取消令牌。</param>
+        Task<IReadOnlyList<ApiKeyModelUsageBreakdown>> AggregateByApiKeyAndModelAsync(
+            long periodStart, long periodEnd,
+            PlatformType platform = PlatformType.DeepSeek,
+            string? apiKeyFilter = null,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// 获取指定平台已出现的 API Key 列表（Name + TrackingId），用于设置页下拉。
+        /// </summary>
+        /// <param name="platform">平台类型。</param>
+        /// <param name="ct">取消令牌。</param>
+        Task<IReadOnlyList<(string TrackingId, string Name)>> GetDistinctApiKeysAsync(
+            PlatformType platform = PlatformType.DeepSeek,
+            CancellationToken ct = default);
 
         /// <summary>
         /// 获取指定平台范围内第一条事件的用户邮箱（用于推断账号信息）。

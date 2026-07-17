@@ -12,8 +12,8 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
 {
     /// <summary>
     /// DeepSeek 平台数据采集 Provider。
-    /// 采集逻辑：每次拉取本月全量数据（1 日至明日 UTC 午夜），按 api_key × model × day 聚合为事件实体。
-    /// DeepSeek 无订阅周期、无缓存写入 token、无 cookie 过期概念。
+    /// 采集逻辑：每次从「当前日期往前两个自然月」的 1 日拉取至今日，按 api_key × model × day 入库；
+    /// 用户信息来自 auth-api/users/current，账户余额/累计消费来自 get_user_summary。
     /// </summary>
     public sealed class DeepSeekPlatformProvider : IPlatformProvider
     {
@@ -51,32 +51,44 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
         {
             var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            // 1. 计算本月时间范围（UTC 自然月：1 日 00:00 至明日 00:00）
-            var (startSec, endSec) = GetCurrentMonthRangeUtc();
+            // 1. 拉取窗口：当前日期往前两个自然月的 1 日 → 明日（如 7.17 → 5.1；8.17 → 6.1）
+            //    大屏「本月」仍用当前自然月范围
+            var (pullStartSec, pullEndSec) = GetPullRangeUtc();
+            var (monthStartSec, monthEndSec) = GetCurrentMonthRangeUtc();
+            var monthStartMs = monthStartSec * 1000;
 
-            // 2. 并发拉取 4 个端点
+            // 2. 并发拉取：账户汇总 / 用量 / 费用 / Key 列表 / 当前用户
             var summaryTask = SafeGetAsync(() => _apiClient.GetUserSummaryAsync(token, ct));
-            var amountTask = SafeGetAsync(() => _apiClient.GetUsageAmountAsync(token, startSec, endSec, ct));
-            var costTask = SafeGetAsync(() => _apiClient.GetUsageCostAsync(token, startSec, endSec, ct));
+            var amountTask = SafeGetAsync(() => _apiClient.GetUsageAmountAsync(token, pullStartSec, pullEndSec, ct));
+            var costTask = SafeGetAsync(() => _apiClient.GetUsageCostAsync(token, pullStartSec, pullEndSec, ct));
             var keysTask = SafeGetAsync(() => _apiClient.GetApiKeysAsync(token, ct));
+            var userTask = SafeGetAsync(() => _apiClient.GetCurrentUserAsync(token, ct));
 
-            await Task.WhenAll(summaryTask, amountTask, costTask, keysTask);
+            await Task.WhenAll(summaryTask, amountTask, costTask, keysTask, userTask);
 
             DeepSeekUserSummaryDto? summary = await summaryTask;
             DeepSeekUsageAmountDto? amount = await amountTask;
             DeepSeekUsageCostDto? cost = await costTask;
             DeepSeekApiKeysDto? keys = await keysTask;
+            DeepSeekCurrentUserDto? currentUser = await userTask;
 
-            // 3. 构建按 (day, apiKey, model) 索引的费用查找表
+            // 3. 构建按 (day, trackingId, model) 索引的费用查找表
             var costLookup = BuildCostLookup(cost);
 
-            // 4. 将每日用量桶映射为事件实体
+            // 4. 将每日用量桶映射为事件实体（按 api_key × model 区分存储，含 REQUEST）
             var entities = new List<UsageEventEntity>();
+            long monthRequests = 0;
             if (amount?.Series is not null)
             {
                 foreach (var series in amount.Series)
                 {
-                    var apiKeyName = series.ApiKey?.Name ?? "unknown";
+                    var trackingId = series.ApiKey?.TrackingId
+                                     ?? series.ApiKey?.SensitiveId
+                                     ?? series.ApiKey?.Name
+                                     ?? "unknown";
+                    var apiKeyName = series.ApiKey?.Name
+                                     ?? series.ApiKey?.SensitiveId
+                                     ?? trackingId;
                     var model = series.Model ?? "unknown";
                     if (series.Buckets is null) continue;
 
@@ -92,29 +104,35 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
                             continue;
                         }
 
-                        // 时间戳从秒转毫秒
                         var tsMs = bucket.Time * 1000;
-                        // 查找对应费用（CNY 元 → 分）
-                        var costYuan = costLookup.TryGetValue((bucket.Time, apiKeyName, model), out var c) ? c : 0m;
-                        var costCents = (decimal)(costYuan * 100);
+                        var costYuan = costLookup.TryGetValue((bucket.Time, trackingId, model), out var c) ? c : 0m;
+                        var costCents = costYuan * 100;
+
+                        // 本月请求数仅统计当前自然月（大屏总请求次数）
+                        if (tsMs >= monthStartMs)
+                        {
+                            monthRequests += usage.Request;
+                        }
 
                         entities.Add(new UsageEventEntity
                         {
                             Platform = PlatformType.DeepSeek,
                             Timestamp = tsMs,
+                            // UserEmail 存 API Key 显示名；Kind 存 tracking_id（稳定标识）
                             UserEmail = apiKeyName,
                             Model = model,
-                            Kind = "api",
+                            Kind = trackingId,
                             MaxMode = false,
                             RequestsCosts = 0,
+                            RequestCount = usage.Request,
                             IsTokenBasedCall = true,
                             IsChargeable = costCents > 0,
                             IsHeadless = false,
-                            // DeepSeek token 映射：缓存未命中=输入，缓存命中=缓存读取，响应=输出
+                            // DeepSeek：缓存未命中=输入，缓存命中=缓存读取，响应=输出
                             InputTokens = usage.PromptCacheMissToken,
                             OutputTokens = usage.ResponseToken,
                             CacheReadTokens = usage.PromptCacheHitToken,
-                            CacheWriteTokens = 0, // DeepSeek 无缓存写入
+                            CacheWriteTokens = 0,
                             TotalCents = costCents,
                             CursorTokenFee = 0,
                             ChargedCents = costCents,
@@ -124,37 +142,21 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
                 }
             }
 
-            // 5. 映射周期汇总实体（DeepSeek 按自然月统计）
+            // 5. 周期汇总：本月消费 + 余额 + 本月请求数；累计消费写入 FastPremiumRequests（分）
             PeriodUsageEntity? periodEntity = null;
             if (summary is not null)
             {
-                periodEntity = MapToPeriodEntity(summary, startSec, endSec, nowMs);
+                periodEntity = MapToPeriodEntity(summary, monthStartSec, monthEndSec, nowMs, monthRequests);
             }
 
-            // 6. 映射用户信息（用 API Key 名称作为用户标识）
-            // DeepSeek 无订阅/限额概念，限额相关字段设为 0 兼容旧库 NOT NULL 约束
-            UserInfoEntity? userEntity = null;
-            var firstKeyName = keys?.ApiKeys?.FirstOrDefault()?.Name;
-            if (firstKeyName is not null)
-            {
-                userEntity = new UserInfoEntity
-                {
-                    Platform = PlatformType.DeepSeek,
-                    Email = firstKeyName,
-                    Name = firstKeyName,
-                    PlanName = null,
-                    Role = null,
-                    MonthlyLimitDollars = 0,
-                    HardLimitOverrideDollars = 0,
-                    SnapshotTime = nowMs
-                };
-            }
+            // 6. 用户信息来自 auth-api/users/current（不是 get_api_keys）
+            UserInfoEntity? userEntity = MapToUserEntity(currentUser, keys, nowMs);
 
-            // 7. 映射订阅/账单信息（DeepSeek 无订阅，存储账户余额）
+            // 7. 订阅位复用：存账户余额与累计消费（周期字段仍为本自然月）
             SubscriptionEntity? subEntity = null;
             if (summary is not null)
             {
-                subEntity = MapToSubscriptionEntity(summary, startSec, endSec, nowMs);
+                subEntity = MapToSubscriptionEntity(summary, currentUser, monthStartSec, monthEndSec, nowMs);
             }
 
             return new PlatformSyncResult
@@ -164,22 +166,35 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
                 PeriodUsage = periodEntity,
                 UserInfo = userEntity,
                 Subscription = subEntity,
-                SessionExpiryUtc = null, // DeepSeek token 无 cookie 过期概念
-                SyncSummary = $"拉取 {entities.Count} 条日用量记录"
+                SessionExpiryUtc = null,
+                SyncSummary = $"拉取 {entities.Count} 条日用量（自 {DateTimeOffset.FromUnixTimeSeconds(pullStartSec):yyyy-MM-dd}），本月请求 {monthRequests} 次"
             };
         }
 
         /// <summary>
-        /// 获取当前自然月的 UTC 时间范围（秒）。
-        /// start = 本月 1 日 00:00:00 UTC，end = 明日 00:00:00 UTC（包含今天）。
+        /// 用量拉取窗口（UTC 秒）：当前日期往前两个自然月的 1 日 00:00 → 明日 00:00。
+        /// 例：7.17 → 5.1；8.17 → 6.1。
+        /// </summary>
+        private static (long startSec, long endSec) GetPullRangeUtc()
+        {
+            var utcNow = DateTime.UtcNow;
+            var startMonth = new DateTime(utcNow.Year, utcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-2);
+            var tomorrow = DateTime.SpecifyKind(utcNow.Date.AddDays(1), DateTimeKind.Utc);
+
+            var startSec = new DateTimeOffset(startMonth).ToUnixTimeSeconds();
+            var endSec = new DateTimeOffset(tomorrow).ToUnixTimeSeconds();
+            return (startSec, endSec);
+        }
+
+        /// <summary>
+        /// 当前自然月的 UTC 时间范围（秒），用于大屏「本月」聚合。
+        /// start = 本月 1 日 00:00:00 UTC，end = 明日 00:00:00 UTC。
         /// </summary>
         private static (long startSec, long endSec) GetCurrentMonthRangeUtc()
         {
             var utcNow = DateTime.UtcNow;
             var monthStart = new DateTime(utcNow.Year, utcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-            var tomorrow = utcNow.Date.AddDays(1).AddTicks(-1).AddTicks(1); // 明日 00:00:00 UTC
-            // 确保 tomorrow 是 UTC
-            tomorrow = DateTime.SpecifyKind(tomorrow.Date, DateTimeKind.Utc);
+            var tomorrow = DateTime.SpecifyKind(utcNow.Date.AddDays(1), DateTimeKind.Utc);
 
             var startSec = new DateTimeOffset(monthStart).ToUnixTimeSeconds();
             var endSec = new DateTimeOffset(tomorrow).ToUnixTimeSeconds();
@@ -187,8 +202,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
         }
 
         /// <summary>
-        /// 构建费用查找表：Key=(day 时间戳秒, apiKeyName, model)，Value=费用（元）。
-        /// 用于将 amount 端点的用量桶与 cost 端点的费用桶匹配。
+        /// 构建费用查找表：Key=(day 秒, trackingId, model)，Value=费用（元）。
         /// </summary>
         private static Dictionary<(long, string, string), decimal> BuildCostLookup(DeepSeekUsageCostDto? cost)
         {
@@ -200,7 +214,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
                 if (currencyEntry.Series is null) continue;
                 foreach (var series in currencyEntry.Series)
                 {
-                    var apiKeyName = series.ApiKey?.Name ?? "unknown";
+                    var trackingId = series.ApiKey?.TrackingId
+                                     ?? series.ApiKey?.SensitiveId
+                                     ?? series.ApiKey?.Name
+                                     ?? "unknown";
                     var model = series.Model ?? "unknown";
                     if (series.Buckets is null) continue;
 
@@ -209,8 +226,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
                         var costYuan = bucket.Cost ?? 0m;
                         if (costYuan == 0) continue;
 
-                        // 同一天同一 key 同一模型可能有多个币种，累加（实际 DeepSeek 通常单币种 CNY）
-                        var key = (bucket.Time, apiKeyName, model);
+                        var key = (bucket.Time, trackingId, model);
                         lookup[key] = lookup.TryGetValue(key, out var existing) ? existing + costYuan : costYuan;
                     }
                 }
@@ -219,17 +235,17 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
         }
 
         /// <summary>
-        /// 将 get_user_summary 映射为周期汇总实体。
-        /// DeepSeek 按自然月统计，费用为 CNY（存储为分）。
+        /// 将 get_user_summary 映射为周期汇总。
+        /// TotalSpendCents=本月消费（分）；RemainingRequests=充值余额（分）；
+        /// FastPremiumRequests=累计消费（分）；UsedRequests=本月 REQUEST 合计。
         /// </summary>
         private static PeriodUsageEntity MapToPeriodEntity(
-            DeepSeekUserSummaryDto summary, long startSec, long endSec, long fetchMs)
+            DeepSeekUserSummaryDto summary, long startSec, long endSec, long fetchMs, long totalRequests)
         {
-            var monthlyTokens = summary.MonthlyUsage ?? 0;
+            var monthlyTokens = summary.MonthlyUsage ?? summary.MonthlyTokenUsage ?? 0;
             var monthlyCostYuan = summary.MonthlyCosts?.FirstOrDefault()?.Amount ?? 0m;
-            var monthlyCostCents = monthlyCostYuan * 100;
+            var totalCostYuan = summary.TotalCosts?.FirstOrDefault()?.Amount ?? 0m;
             var balanceYuan = summary.NormalWallets?.FirstOrDefault()?.Balance ?? 0m;
-            var balanceCents = balanceYuan * 100;
 
             return new PeriodUsageEntity
             {
@@ -237,29 +253,55 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
                 FetchTime = fetchMs,
                 PeriodStart = startSec * 1000,
                 PeriodEnd = endSec * 1000,
-                PlanName = null,
+                PlanName = "pay-as-you-go",
                 IncludedRequests = 0,
-                UsedRequests = 0,
+                UsedRequests = totalRequests,
                 UsedTokens = monthlyTokens,
-                TotalSpendCents = monthlyCostCents,
-                FastPremiumRequests = 0,
-                // remaining 复用为账户余额（分）
-                RemainingRequests = (long)balanceCents,
+                TotalSpendCents = monthlyCostYuan * 100,
+                // DeepSeek 复用：累计消费金额（分）
+                FastPremiumRequests = (long)(totalCostYuan * 100),
+                // DeepSeek 复用：账户充值余额（分）
+                RemainingRequests = (long)(balanceYuan * 100),
                 RawJson = SafeSerialize(summary)
             };
         }
 
         /// <summary>
-        /// 将 get_user_summary 映射为订阅实体。
-        /// DeepSeek 无订阅概念，存储账户余额与总费用信息。
+        /// 从 auth-api 用户信息映射 UserInfo；失败时回退到首个 API Key 名（兼容旧逻辑）。
+        /// </summary>
+        private static UserInfoEntity? MapToUserEntity(
+            DeepSeekCurrentUserDto? currentUser, DeepSeekApiKeysDto? keys, long nowMs)
+        {
+            var email = currentUser?.Email
+                        ?? currentUser?.MobileNumber
+                        ?? keys?.ApiKeys?.FirstOrDefault()?.Name;
+            if (email is null) return null;
+
+            return new UserInfoEntity
+            {
+                Platform = PlatformType.DeepSeek,
+                Email = email,
+                Name = currentUser?.IdProfile?.Name ?? email,
+                PlanName = "pay-as-you-go",
+                Role = currentUser?.IdProfile?.Region,
+                MonthlyLimitDollars = 0,
+                HardLimitOverrideDollars = 0,
+                SnapshotTime = nowMs
+            };
+        }
+
+        /// <summary>
+        /// 将账户余额/累计消费映射到订阅实体（DeepSeek 无 Stripe 订阅）。
         /// </summary>
         private static SubscriptionEntity MapToSubscriptionEntity(
-            DeepSeekUserSummaryDto summary, long startSec, long endSec, long fetchMs)
+            DeepSeekUserSummaryDto summary,
+            DeepSeekCurrentUserDto? currentUser,
+            long startSec,
+            long endSec,
+            long fetchMs)
         {
             var totalCostYuan = summary.TotalCosts?.FirstOrDefault()?.Amount ?? 0m;
-            var totalCostCents = totalCostYuan * 100;
             var balanceYuan = summary.NormalWallets?.FirstOrDefault()?.Balance ?? 0m;
-            var balanceCents = balanceYuan * 100;
 
             return new SubscriptionEntity
             {
@@ -273,12 +315,14 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Platforms
                 CancelAtPeriodEnd = false,
                 SubscriptionStart = 0,
                 InvoiceCount = 0,
-                Email = null,
+                Email = currentUser?.Email,
                 RawJson = SafeSerialize(new
                 {
-                    totalCostCents,
-                    balanceCents,
-                    summary
+                    balanceYuan,
+                    totalCostYuan,
+                    monthlyCostYuan = summary.MonthlyCosts?.FirstOrDefault()?.Amount ?? 0m,
+                    summary,
+                    currentUser
                 })
             };
         }

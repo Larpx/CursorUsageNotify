@@ -35,8 +35,9 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
                 return 0;
             }
 
+            // 含 Model：DeepSeek 同日同 Key 多模型需分存，不能互相覆盖
             var x = _db.Storageable(list)
-                .WhereColumns(p => new { p.Timestamp, p.UserEmail, p.Platform })
+                .WhereColumns(p => new { p.Timestamp, p.UserEmail, p.Platform, p.Model })
                 .ToStorage();
 
             var inserted = await x.AsInsertable.ExecuteCommandAsync(ct);
@@ -188,6 +189,7 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
         public async Task<UsageAggregateStats> AggregateStatsAsync(
             long periodStart, long periodEnd,
             PlatformType platform = PlatformType.Cursor,
+            string? apiKeyFilter = null,
             CancellationToken ct = default)
         {
             if (periodStart <= 0 || periodEnd <= 0 || periodStart >= periodEnd)
@@ -195,15 +197,24 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
                 return new UsageAggregateStats { PeriodStart = periodStart, PeriodEnd = periodEnd };
             }
 
-            var events = await _db.Queryable<UsageEventEntity>()
+            var query = _db.Queryable<UsageEventEntity>()
                 .Where(e => e.Platform == platform)
-                .Where(e => e.Timestamp >= periodStart && e.Timestamp <= periodEnd)
-                .ToListAsync(ct);
+                .Where(e => e.Timestamp >= periodStart && e.Timestamp <= periodEnd);
+
+            if (!string.IsNullOrWhiteSpace(apiKeyFilter))
+            {
+                query = query.Where(e => e.Kind == apiKeyFilter || e.UserEmail == apiKeyFilter);
+            }
+
+            var events = await query.ToListAsync(ct);
+
+            // RequestCount：DeepSeek 存 usage.REQUEST；旧数据/未填时按 1（Cursor 单事件）计
+            var totalRequests = events.Sum(e => e.RequestCount > 0 ? e.RequestCount : 1);
 
             return new UsageAggregateStats
             {
                 TotalTokens = events.Sum(e => e.InputTokens + e.OutputTokens + e.CacheReadTokens + e.CacheWriteTokens),
-                TotalRequests = events.Count,
+                TotalRequests = (int)Math.Min(totalRequests, int.MaxValue),
                 TotalSpendCents = events.Sum(e => e.ChargedCents),
                 TotalInputTokens = events.Sum(e => e.InputTokens),
                 TotalOutputTokens = events.Sum(e => e.OutputTokens),
@@ -228,7 +239,10 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
         }
 
         /// <inheritdoc/>
-        public async Task<UsageAggregateStats> AggregateWeeklyStatsAsync(PlatformType platform = PlatformType.Cursor, CancellationToken ct = default)
+        public async Task<UsageAggregateStats> AggregateWeeklyStatsAsync(
+            PlatformType platform = PlatformType.Cursor,
+            string? apiKeyFilter = null,
+            CancellationToken ct = default)
         {
             var now = DateTime.Now;
             var daysSinceMonday = now.DayOfWeek == DayOfWeek.Sunday ? 6 : (int)now.DayOfWeek - (int)DayOfWeek.Monday;
@@ -237,17 +251,92 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Storage
             var weekStart = new DateTimeOffset(monday, TimeZoneInfo.Local.GetUtcOffset(monday)).ToUnixTimeMilliseconds();
             var weekEnd = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            return await AggregateStatsAsync(weekStart, weekEnd, platform, ct);
+            return await AggregateStatsAsync(weekStart, weekEnd, platform, apiKeyFilter, ct);
         }
 
         /// <inheritdoc/>
-        public async Task<UsageAggregateStats> AggregateDailyStatsAsync(PlatformType platform = PlatformType.Cursor, CancellationToken ct = default)
+        public async Task<UsageAggregateStats> AggregateDailyStatsAsync(
+            PlatformType platform = PlatformType.Cursor,
+            string? apiKeyFilter = null,
+            CancellationToken ct = default)
         {
             var today = DateTime.Now.Date;
             var dayStart = new DateTimeOffset(today, TimeZoneInfo.Local.GetUtcOffset(today)).ToUnixTimeMilliseconds();
             var dayEnd = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            return await AggregateStatsAsync(dayStart, dayEnd, platform, ct);
+            return await AggregateStatsAsync(dayStart, dayEnd, platform, apiKeyFilter, ct);
+        }
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<ApiKeyModelUsageBreakdown>> AggregateByApiKeyAndModelAsync(
+            long periodStart, long periodEnd,
+            PlatformType platform = PlatformType.DeepSeek,
+            string? apiKeyFilter = null,
+            CancellationToken ct = default)
+        {
+            if (periodStart <= 0 || periodEnd <= 0 || periodStart >= periodEnd)
+            {
+                return Array.Empty<ApiKeyModelUsageBreakdown>();
+            }
+
+            var query = _db.Queryable<UsageEventEntity>()
+                .Where(e => e.Platform == platform)
+                .Where(e => e.Timestamp >= periodStart && e.Timestamp <= periodEnd);
+
+            if (!string.IsNullOrWhiteSpace(apiKeyFilter))
+            {
+                query = query.Where(e => e.Kind == apiKeyFilter || e.UserEmail == apiKeyFilter);
+            }
+
+            var events = await query.ToListAsync(ct);
+
+            return events
+                .GroupBy(e => new
+                {
+                    TrackingId = e.Kind ?? string.Empty,
+                    Name = e.UserEmail ?? string.Empty,
+                    Model = e.Model ?? "unknown"
+                })
+                .Select(g => new ApiKeyModelUsageBreakdown
+                {
+                    ApiKeyTrackingId = g.Key.TrackingId,
+                    ApiKeyName = string.IsNullOrEmpty(g.Key.Name) ? g.Key.TrackingId : g.Key.Name,
+                    Model = g.Key.Model,
+                    InputTokens = g.Sum(e => e.InputTokens),
+                    OutputTokens = g.Sum(e => e.OutputTokens),
+                    CacheReadTokens = g.Sum(e => e.CacheReadTokens),
+                    TotalTokens = g.Sum(e => e.InputTokens + e.OutputTokens + e.CacheReadTokens + e.CacheWriteTokens),
+                    RequestCount = g.Sum(e => e.RequestCount > 0 ? e.RequestCount : 1),
+                    SpendCents = g.Sum(e => e.ChargedCents)
+                })
+                .OrderBy(x => x.ApiKeyName)
+                .ThenBy(x => x.Model)
+                .ToList();
+        }
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<(string TrackingId, string Name)>> GetDistinctApiKeysAsync(
+            PlatformType platform = PlatformType.DeepSeek,
+            CancellationToken ct = default)
+        {
+            var rows = await _db.Queryable<UsageEventEntity>()
+                .Where(e => e.Platform == platform)
+                .Where(e => e.UserEmail != null && e.UserEmail != "")
+                .Select(e => new { e.Kind, e.UserEmail })
+                .Distinct()
+                .ToListAsync(ct);
+
+            return rows
+                .GroupBy(r => r.Kind ?? r.UserEmail ?? string.Empty)
+                .Select(g =>
+                {
+                    var name = g.Select(x => x.UserEmail).FirstOrDefault(n => !string.IsNullOrEmpty(n))
+                               ?? g.Key;
+                    return (TrackingId: g.Key, Name: name!);
+                })
+                .Where(x => !string.IsNullOrEmpty(x.TrackingId))
+                .OrderBy(x => x.Name)
+                .ToList();
         }
     }
 }

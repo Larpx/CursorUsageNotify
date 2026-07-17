@@ -232,7 +232,8 @@
 
                 <!-- DeepSeek 平台列 -->
                 <Border Grid.Column="1" BorderBrush="#FF374151" BorderThickness="1" CornerRadius="8" Padding="12,10"
-                        IsVisible="{Binding DeepSeekDashboard.IsEnabled}">
+                        IsVisible="{Binding DeepSeekDashboard.IsEnabled}"
+                        ToolTip.Tip="{Binding DeepSeekDashboard.UsageBreakdownTooltip}">
                     <StackPanel Orientation="Vertical" Spacing="8">
                         <!-- 平台标题 -->
                         <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -240,15 +241,23 @@
                             <TextBlock Text="{Binding DeepSeekDashboard.PlanName, StringFormat=（{0}）}" FontSize="11" Foreground="#FF9CA3AF"/>
                         </StackPanel>
 
-                        <!-- 账户信息行（无订阅周期/状态，DeepSeek 按自然月） -->
+                        <!-- 账户摘要：余额 / 累计消费 / 总请求（hover 显示按 Key×模型明细） -->
                         <StackPanel Orientation="Horizontal" Spacing="16">
                             <StackPanel Orientation="Vertical" Spacing="1" MinWidth="100">
                                 <TextBlock Text="用户" FontSize="10" Foreground="#FF6B7280"/>
                                 <TextBlock Text="{Binding DeepSeekDashboard.DisplayName}" FontSize="12" FontWeight="SemiBold" Foreground="#FFD1D5DB"/>
                             </StackPanel>
-                            <StackPanel Orientation="Vertical" Spacing="1" MinWidth="180">
-                                <TextBlock Text="本月周期" FontSize="10" Foreground="#FF6B7280"/>
-                                <TextBlock Text="{Binding DeepSeekDashboard.PeriodRange}" FontSize="12" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
+                            <StackPanel Orientation="Vertical" Spacing="1" MinWidth="90">
+                                <TextBlock Text="账户余额" FontSize="10" Foreground="#FF6B7280"/>
+                                <TextBlock Text="{Binding DeepSeekDashboard.AccountBalance, StringFormat=¥{0:F2}}" FontSize="12" FontWeight="SemiBold" Foreground="#FFA78BFA"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Vertical" Spacing="1" MinWidth="100">
+                                <TextBlock Text="累计消费" FontSize="10" Foreground="#FF6B7280"/>
+                                <TextBlock Text="{Binding DeepSeekDashboard.CumulativeSpend, StringFormat=¥{0:F2}}" FontSize="12" FontWeight="SemiBold" Foreground="#FFF87171"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Vertical" Spacing="1" MinWidth="90">
+                                <TextBlock Text="总请求次数" FontSize="10" Foreground="#FF6B7280"/>
+                                <TextBlock Text="{Binding DeepSeekDashboard.TotalRequestCount, StringFormat={}{0:N0}}" FontSize="12" FontWeight="SemiBold" Foreground="#FF67E8F9"/>
                             </StackPanel>
                         </StackPanel>
 

@@ -60,6 +60,13 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Models.Entities
         public decimal RequestsCosts { get; set; }
 
         /// <summary>
+        /// 请求次数。
+        /// Cursor 单次事件为 1；DeepSeek 为 usage.REQUEST（按日×Key×模型桶累计）。
+        /// </summary>
+        [SugarColumn(ColumnName = "request_count")]
+        public long RequestCount { get; set; } = 1;
+
+        /// <summary>
         /// 是否按 token 计费。
         /// </summary>
         [SugarColumn(ColumnName = "is_token_based_call")]

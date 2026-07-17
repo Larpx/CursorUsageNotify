@@ -76,6 +76,13 @@ namespace Larpx.PersonalTools.CursorUsageNotify.Services.Http
         }
 
         /// <inheritdoc/>
+        public async Task<DeepSeekCurrentUserDto> GetCurrentUserAsync(string userToken, CancellationToken ct = default)
+        {
+            var resp = await SendGetAsync<DeepSeekCurrentUserDto>(userToken, Constants.DeepSeekCurrentUserPath, ct);
+            return resp ?? throw new DeepSeekApiException("users/current 返回空数据");
+        }
+
+        /// <inheritdoc/>
         public async Task<DeepSeekUsageAmountDto> GetUsageAmountAsync(
             string userToken, long startSec, long endSec, CancellationToken ct = default)
         {
